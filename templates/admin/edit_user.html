@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Edit User{% endblock %}
+{% block content %}
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <h2>Edit User: {{ user.username }}</h2>
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <input type="text" value="{{ user.username }}" class="form-control" disabled>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" value="{{ user.email }}" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">New Password (leave blank to keep current)</label>
+                    <input type="password" name="new_password" class="form-control">
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" name="is_admin" class="form-check-input" {% if user.is_admin %}checked{% endif %}>
+                    <label class="form-check-label">Is Admin</label>
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" name="is_active" class="form-check-input" {% if user.is_active %}checked{% endif %}>
+                    <label class="form-check-label">Is Active</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Update User</button>
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Thêm Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<div class="container mt-5">
+    <h2 class="text-center">Báo cáo</h2>
+    
+    {% if is_admin %}
+    <form method="GET" action="{{ url_for('report') }}" class="mb-4">
+        <div class="mb-3">
+            <label for="user_select" class="form-label">Chọn nhân viên</label>
+            <select class="form-select" id="user_select" name="search_user">
+                <option value="">Tất cả nhân viên</option>
+                {% for user in users %}
+                    <option value="{{ user.username }}" {% if search_user == user.username %} selected {% endif %}>
+                        {{ user.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Lọc báo cáo</button>
+    </form>
+    {% endif %}
+
+    <!-- Thống kê số liệu -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Thống kê tiền thu</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Tổng số tiền giao thu: <span class="fw-bold">{{ '{:,.0f}'.format(total_money) }} VNĐ</span></p>
+                    <p class="card-text">Số tiền đã thu: <span class="fw-bold text-success">{{ '{:,.0f}'.format(total_paid_money) }} VNĐ</span></p>
+                    <p class="card-text">Số tiền chưa thu: <span class="fw-bold text-danger">{{ '{:,.0f}'.format(total_unpaid_money) }} VNĐ</span></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Thống kê hóa đơn</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Tổng số hóa đơn: <span class="fw-bold">{{ total_invoices }}</span></p>
+                    <p class="card-text">Số hóa đơn đã thu: <span class="fw-bold text-success">{{ total_paid_invoices }}</span></p>
+                    <p class="card-text">Số hóa đơn chưa thu: <span class="fw-bold text-danger">{{ total_unpaid_invoices }}</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Biểu đồ -->
+    <div class="row">
+        <!-- Biểu đồ tròn thống kê tiền -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Biểu đồ thống kê tiền thu</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="moneyChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Biểu đồ tròn thống kê hóa đơn -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Biểu đồ thống kê hóa đơn</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="invoiceChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    Chart.register(ChartDataLabels);
+
+    // Truyền dữ liệu từ Flask vào JavaScript dưới dạng JSON
+    const totalMoney = JSON.parse('{{ total_money | tojson | safe }}');
+    const totalPaidMoney = JSON.parse('{{ total_paid_money | tojson | safe }}');
+    const totalUnpaidMoney = JSON.parse('{{ total_unpaid_money | tojson | safe }}');
+
+    const totalInvoices = JSON.parse('{{ total_invoices | tojson | safe }}');
+    const totalPaidInvoices = JSON.parse('{{ total_paid_invoices | tojson | safe }}');
+    const totalUnpaidInvoices = JSON.parse('{{ total_unpaid_invoices | tojson | safe }}');
+
+    // Cấu hình chung cho biểu đồ
+    function createConfig(data, labels) {
+        return {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.8)',
+                        'rgba(220, 53, 69, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgb(40, 167, 69)',
+                        'rgb(220, 53, 69)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    datalabels: {
+                        color: '#000',
+                        anchor: 'center',
+                        align: 'center',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        formatter: function(value, context) {
+                            const dataset = context.chart.data.datasets[0];
+                            const total = dataset.data.reduce((acc, data) => acc + parseFloat(data), 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return percentage + '%';
+                        }
+                    }
+                },
+                layout: {
+                    padding: 20
+                }
+            }
+        };
+    }
+
+    // Khởi tạo biểu đồ khi trang đã load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Biểu đồ tiền
+        const moneyCtx = document.getElementById('moneyChart').getContext('2d');
+        new Chart(moneyCtx, createConfig(
+            [totalPaidMoney, totalUnpaidMoney],
+            ['Đã thu', 'Chưa thu']
+        ));
+
+        // Biểu đồ hóa đơn
+        const invoiceCtx = document.getElementById('invoiceChart').getContext('2d');
+        new Chart(invoiceCtx, createConfig(
+            [totalPaidInvoices, totalUnpaidInvoices],
+            ['Đã thu', 'Chưa thu']
+        ));
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}In Biên Lai{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h3>Biên Lai Thu Tiền</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Mã Khách Hàng:</strong> {{ data.ma_khach_hang }}</p>
+                    <p><strong>Tên Khách Hàng:</strong> {{ data.ten_khach_hang }}</p>
+                    <p><strong>Địa Chỉ:</strong> {{ data.dia_chi }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Mã Lộ:</strong> {{ data.ma_lo }}</p>
+                    <p><strong>Số Kwh:</strong> {{ data.kwh }}</p>
+                </div>
+            </div>
+            <hr>
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <table class="table">
+                        <tr>
+                            <td><strong>Tiền Điện:</strong></td>
+                            <td class="text-right">{{ "{:,.0f}".format(data.tien_dien) }} VNĐ</td>
+                        </tr>
+                        <tr>
+                            <td><strong>VAT:</strong></td>
+                            <td class="text-right">{{ "{:,.0f}".format(data.vat) }} VNĐ</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Tổng Tiền:</strong></td>
+                            <td class="text-right"><strong>{{ "{:,.0f}".format(data.tong_tien) }} VNĐ</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Ngày thu:</strong></td>
+                            <td class="text-right">{% if data.ngay_thu %}
+                                {{ data.ngay_thu.strftime('%d/%m/%Y %H:%M') }}
+                            {% else %}
+                                Chưa gạch nợ
+                            {% endif %}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer text-center">
+            <button onclick="window.print()" class="btn btn-primary">In Biên Lai</button>
+            <button onclick="window.close()" class="btn btn-secondary">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<!-- CSS cho chế độ in ấn -->
+<style>
+    @media print {
+        /* Ẩn các phần không cần thiết khi in */
+        body * {
+            visibility: hidden;
+        }
+        
+        .container, .container * {
+            visibility: visible;
+        }
+        
+        .container {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        /* Ẩn footer khi in */
+        .card-footer {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}

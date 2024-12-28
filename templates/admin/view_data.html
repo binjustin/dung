@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+
+{% block title %}View Data{% endblock %}
+
+{% block content %}
+    <h2 class="h5">View Data</h2>
+
+    <!-- Form tìm kiếm và chọn số lượng bản ghi hiển thị -->
+    <form method="GET" action="{{ url_for('view_data') }}">
+        <div class="row mb-3">
+            {% if user.is_admin %}
+                <div class="col">
+                    <div class="form-group">
+                        <label for="search_user">Nhân Viên Quản Lý</label>
+                        <select name="search_user" id="search_user" class="form-control form-control-sm" onchange="this.form.submit()">
+                            <option value="">-- All --</option>
+                            {% for u in users %}
+                                <option value="{{ u.username }}" {% if u.username == search_user %}selected{% endif %}>{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Dropdown tìm kiếm theo Mã Lộ -->
+            <div class="col">
+                <div class="form-group">
+                    <label for="search_ma_lo">Mã Lộ</label>
+                    <select name="search_ma_lo" id="search_ma_lo" class="form-control form-control-sm" onchange="this.form.submit()">
+                        <option value="">-- All --</option>
+                        {% for ma_lo in ma_lo_list %}
+                            <option value="{{ ma_lo }}" {% if ma_lo == search_ma_lo %}selected{% endif %}>{{ ma_lo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="col">
+                <div class="form-group">
+                    <label for="search_trang_thai">Trạng Thái</label>
+                    <select name="search_trang_thai" id="search_trang_thai" class="form-control form-control-sm" onchange="this.form.submit()">
+                        <option value="">-- All --</option>
+                        <option value="Chưa thanh toán" {% if search_trang_thai == 'Chưa thanh toán' %}selected{% endif %}>Chưa thanh toán</option>
+                        <option value="Đã thanh toán" {% if search_trang_thai == 'Đã thanh toán' %}selected{% endif %}>Đã thanh toán</option>
+                    </select>
+                </div>
+            </div>    
+            
+            <div class="col">
+                <div class="form-group">
+                    <label for="search_ten_khach_hang">Tên Khách Hàng</label>
+                    <input type="text" name="search_ten_khach_hang" id="search_ten_khach_hang" class="form-control form-control-sm" value="{{ search_ten_khach_hang }}" placeholder="Nhập tên khách hàng" onchange="this.form.submit()">
+                </div>
+            </div>
+
+                    <!-- Search by Ngày Thu -->
+            <div class="col">
+                <div class="form-group">
+                    <label for="search_ngay_thu">Ngày Thu</label>
+                    <input type="date" name="search_ngay_thu" id="search_ngay_thu" class="form-control form-control-sm" value="{{ search_ngay_thu or '' }}" onchange="this.form.submit()">
+                </div>
+            </div>
+
+
+            
+            <div class="col">
+                <div class="form-group">
+                    <label for="per_page">Số lượng bản ghi</label>
+                    <select name="per_page" id="per_page" class="form-control form-control-sm" onchange="this.form.submit()">
+                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                        <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Single form for the entire table and delete function -->
+    <form method="POST" id="deleteForm" class="mb-4">
+        {% if user.is_admin %}
+        <div class="mb-2">
+            <button type="submit" class="btn btn-sm btn-danger" id="deleteButton">Delete Selected</button>
+                    <!-- Nút Export -->
+            <a href="{{ url_for('export_data') }}" class="btn btn-sm btn-success ml-2">Export to Excel</a>
+        </div>
+        {% endif %}
+        <table class="table table-bordered table-sm">
+            <thead>
+                <tr>
+                    <th style="text-align: center;"><input type="checkbox" id="selectAll"></th>
+                    <th style="text-align: center;">STT</th>
+                    <th style="text-align: center;">Mã Lộ</th>
+                    <th style="text-align: center;">TT HĐ</th>
+                    <th style="text-align: center;">Mã Khách Hàng</th>
+                    <th style="text-align: center;">Tên Khách Hàng</th>
+                    <th style="text-align: center;">Địa Chỉ</th>
+                    <th style="text-align: center;">Kwh</th>
+                    <th style="text-align: center;">Tiền Điện</th>
+                    <th style="text-align: center;">VAT</th>
+                    <th style="text-align: center;">Tổng Tiền</th>
+                    <th style="text-align: center;">Tài Khoản Quản Lý</th>
+                    <th style="text-align: center;">Trạng Thái</th>
+                    <th style="text-align: center;">Ngày thu</th>
+                    <th style="text-align: center;">Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data.items %}
+                    <tr>
+                        <td style="text-align: center;"><input type="checkbox" name="selected_ids" value="{{ row.id }}" class="checkbox-item"></td>
+                        <td style="text-align: center;">{{ row.stt }}</td>
+                        <td style="text-align: center;">{{ row.ma_lo }}</td>
+                        <td style="text-align: center;">{{ row.tt_hd }}</td>
+                        <td style="text-align: center;">{{ row.ma_khach_hang }}</td>
+                        <td>{{ row.ten_khach_hang }}</td>
+                        <td>{{ row.dia_chi }}</td>
+                        <td>{{ row.kwh }}</td>
+                        <td>{{ "{:,.0f}".format(row.tien_dien)}}</td>
+                        <td>{{ "{:,.0f}".format(row.vat) }}</td>
+                        <td>{{ "{:,.0f}".format(row.tong_tien) }}</td>
+                        <td style="text-align: center;">{{ row.tai_khoan_quan_ly }}</td>
+                        <td class="{% if row.trang_thai == 'Đã thanh toán' %}text-success{% else %}text-danger{% endif %}">
+                            {{ row.trang_thai if row.trang_thai else 'Chưa thanh toán' }}
+                        </td>
+                        <td style="text-align: center;">
+                            {{ row.ngay_thu.strftime('%d/%m/%Y %H:%M') if row.ngay_thu else '' }}
+                        </td>
+                        <td style="text-align: center;">
+                            {% if row.trang_thai == 'Đã thanh toán' %}
+                            <button type="button" class="btn btn-sm btn-danger" onclick="cancelMarkAsPaid('{{ row.id }}')">
+                                <i class="fas fa-times"></i> Hủy gạch nợ
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-warning" onclick="markAsPaid('{{ row.id }}')">
+                                <i class="fas fa-money-bill"></i> Gạch nợ
+                            </button>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-primary" onclick="printReceipt('{{ row.id }}')">
+                                <i class="fas fa-print"></i> In biên lai
+                            </button>
+                        </td>
+                    </tr>
+                {% endfor %}
+                <!-- Dòng tổng tiền -->
+                <tr>
+                    <td colspan="10" class="text-right"><strong>Tổng số tiền:</strong></td>
+                    <td><strong>{{ "{:,.0f}".format(total_amount) }}</strong></td>
+                    <td colspan="3"></td>
+                </tr>
+                <tr>
+                    <td colspan="10" class="text-right"><strong>Tổng số hóa đơn:</strong></td>
+                    <td><strong>{{ total_invoices}}</strong></td>
+                    <td colspan="3"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Phân trang -->
+        <nav>
+            <ul class="pagination pagination-sm">
+                {% if data.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=1, per_page=per_page, search_user=search_user, search_ma_lo=search_ma_lo, search_trang_thai=search_trang_thai) }}">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=data.prev_num, per_page=per_page, search_user=search_user, search_ma_lo=search_ma_lo, search_trang_thai=search_trang_thai) }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in data.iter_pages() %}
+                    <li class="page-item {% if page_num == data.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('view_data', page=page_num, per_page=per_page, search_user=search_user, search_ma_lo=search_ma_lo, search_trang_thai=search_trang_thai) }}">{{ page_num }}</a>
+                    </li>
+                {% endfor %}
+                
+                {% if data.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=data.next_num, per_page=per_page, search_user=search_user, search_ma_lo=search_ma_lo, search_trang_thai=search_trang_thai) }}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('view_data', page=data.pages, per_page=per_page, search_user=search_user, search_ma_lo=search_ma_lo, search_trang_thai=search_trang_thai) }}">Last</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </form>
+{% endblock %}
+
+{% block script %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get elements for delete functionality
+    var selectAllCheckbox = document.getElementById('selectAll');
+    var checkboxItems = document.getElementsByClassName('checkbox-item');
+    var deleteForm = document.getElementById('deleteForm');
+
+    // Add event listener for select all checkbox
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            Array.from(checkboxItems).forEach(function(checkbox) {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        });
+    }
+
+    // Add event listener for delete form submission
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            var checkedBoxes = document.querySelectorAll('.checkbox-item:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Vui lòng chọn ít nhất một mục để xóa');
+                return;
+            }
+
+            if (confirm('Bạn có chắc chắn muốn xóa ' + checkedBoxes.length + ' mục đã chọn?')) {
+                this.submit();
+            }
+        });
+    }
+});
+
+function printReceipt(id) {
+    window.open(`/print_receipt/${id}`, '_blank');
+}
+
+function cancelMarkAsPaid(id) {
+    if(confirm('Bạn có chắc chắn muốn hủy gạch nợ cho hóa đơn này?')) {
+        fetch(`/cancel_mark_as_paid/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                window.location.reload();
+            } else {
+                alert('Có lỗi xảy ra: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Có lỗi xảy ra: ' + error.message);
+        });
+    }
+}
+
+
+function markAsPaid(id) {
+    if(confirm('Bạn có chắc muốn gạch nợ cho hóa đơn này?')) {
+        fetch(`/mark_as_paid/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                window.location.reload();
+            } else {
+                alert('Có lỗi xảy ra: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Có lỗi xảy ra: ' + error.message);
+        });
+    }
+}
+
+
+</script>
+{% endblock %}
