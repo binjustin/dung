@@ -15,6 +15,7 @@ from unidecode import unidecode
 from sqlalchemy import and_, func
 from sqlalchemy import event
 from sqlalchemy import or_
+import requests
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -358,7 +359,7 @@ def view_data():
     search_user = request.args.get('search_user', '', type=str)
     search_ma_lo = request.args.get('search_ma_lo', '', type=str)
     search_trang_thai = request.args.get('search_trang_thai', '', type=str)
-    search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str)
+    search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str).strip()
     search_ngay_thu = request.args.get('search_ngay_thu', '', type=str)
     
     user = User.query.filter_by(username=session['username']).first()
@@ -396,7 +397,9 @@ def view_data():
 
 
     if search_ten_khach_hang:
-        query = query.filter(SalesData.ten_khach_hang.ilike(f'%{search_ten_khach_hang}%'))
+        # Chuyển chuỗi tìm kiếm thành một chuỗi với ký tự % cho mỗi ký tự
+        search_pattern = '%'.join(search_ten_khach_hang)  # %a%b%c%
+        query = query.filter(SalesData.ten_khach_hang.ilike(f'%{search_pattern}%'))
 
     if search_ngay_thu:
         try:
@@ -579,6 +582,245 @@ def create_admin():
             admin.set_password('admin123')  # Đổi mật khẩu này sau khi tạo xong
             db.session.add(admin)
             db.session.commit()
+
+# API Endpoints
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({
+                'success': False,
+                'message': 'Missing username or password'
+            }), 400
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            if not user.is_active:
+                return jsonify({
+                    'success': False,
+                    'message': 'Tài khoản đã bị khóa'
+                }), 403
+            
+            # Tạo token cho phiên đăng nhập (có thể thêm JWT ở đây)
+            session['username'] = username
+            
+            return jsonify({
+                'success': True,
+                'user': {
+                    'username': user.username,
+                    'email': user.email,
+                    'is_admin': user.is_admin
+                }
+            })
+        
+        return jsonify({
+            'success': False,
+            'message': 'Sai tên đăng nhập hoặc mật khẩu'
+        }), 401
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    session.pop('username', None)
+    return jsonify({'success': True})
+
+@app.route('/api/sales', methods=['GET'])
+def api_get_sales():
+    try:
+        if 'username' not in session:
+            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
+        
+        user = User.query.filter_by(username=session['username']).first()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        search_ma_lo = request.args.get('ma_lo', '')
+        search_trang_thai = request.args.get('trang_thai', '')
+        search_ten_khach_hang = request.args.get('ten_khach_hang', '')
+        
+        # Xây dựng query
+        if user.is_admin:
+            query = SalesData.query
+        else:
+            query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
+        
+        # Áp dụng các bộ lọc
+        if search_ma_lo:
+            query = query.filter(SalesData.ma_lo.like(f'%{search_ma_lo}%'))
+        if search_trang_thai:
+            query = query.filter(SalesData.trang_thai == search_trang_thai)
+        if search_ten_khach_hang:
+            query = query.filter(SalesData.ten_khach_hang.like(f'%{search_ten_khach_hang}%'))
+        
+        # Phân trang
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        total_pages = pagination.pages
+        
+        sales_data = pagination.items
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': sale.id,
+                'stt': sale.stt,
+                'ma_lo': sale.ma_lo,
+                'tt_hd': sale.tt_hd,
+                'ma_khach_hang': sale.ma_khach_hang,
+                'ten_khach_hang': sale.ten_khach_hang,
+                'dia_chi': sale.dia_chi,
+                'kwh': sale.kwh,
+                'tien_dien': sale.tien_dien,
+                'vat': sale.vat,
+                'tong_tien': sale.tong_tien,
+                'trang_thai': sale.trang_thai,
+                'ngay_thu': sale.ngay_thu.strftime('%Y-%m-%d %H:%M:%S') if sale.ngay_thu else None
+            } for sale in sales_data],
+            'pagination': {
+                'current_page': page,
+                'total_pages': total_pages,
+                'per_page': per_page,
+                'total_items': pagination.total
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/sales/<int:id>', methods=['GET'])
+def api_get_sale_detail(id):
+    try:
+        if 'username' not in session:
+            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
+        
+        sale = SalesData.query.get_or_404(id)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': sale.id,
+                'stt': sale.stt,
+                'ma_lo': sale.ma_lo,
+                'tt_hd': sale.tt_hd,
+                'ma_khach_hang': sale.ma_khach_hang,
+                'ten_khach_hang': sale.ten_khach_hang,
+                'dia_chi': sale.dia_chi,
+                'kwh': sale.kwh,
+                'tien_dien': sale.tien_dien,
+                'vat': sale.vat,
+                'tong_tien': sale.tong_tien,
+                'trang_thai': sale.trang_thai,
+                'ngay_thu': sale.ngay_thu.strftime('%Y-%m-%d %H:%M:%S') if sale.ngay_thu else None
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/sales/<int:id>/mark_paid', methods=['POST'])
+def api_mark_as_paid(id):
+    try:
+        if 'username' not in session:
+            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
+        
+        sale = SalesData.query.get_or_404(id)
+        sale.trang_thai = 'Đã thanh toán'
+        sale.ngay_thu = datetime.now()
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/sales/<int:id>/cancel_payment', methods=['POST'])
+def api_cancel_payment(id):
+    try:
+        if 'username' not in session:
+            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
+        
+        sale = SalesData.query.get_or_404(id)
+        sale.trang_thai = 'Chưa thanh toán'
+        sale.ngay_thu = None
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/statistics', methods=['GET'])
+def api_get_statistics():
+    try:
+        if 'username' not in session:
+            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
+        
+        user = User.query.filter_by(username=session['username']).first()
+        
+        # Xây dựng query cơ bản
+        if user.is_admin:
+            query = SalesData.query
+        else:
+            query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
+        
+        # Tính toán thống kê
+        total_money = query.with_entities(func.sum(SalesData.tong_tien)).scalar() or 0
+        total_paid = query.filter_by(trang_thai='Đã thanh toán').with_entities(func.sum(SalesData.tong_tien)).scalar() or 0
+        total_unpaid = query.filter_by(trang_thai='Chưa thanh toán').with_entities(func.sum(SalesData.tong_tien)).scalar() or 0
+        
+        # Đếm số lượng hóa đơn
+        total_invoices = query.count()
+        total_paid_invoices = query.filter_by(trang_thai='Đã thanh toán').count()
+        total_unpaid_invoices = query.filter_by(trang_thai='Chưa thanh toán').count()
+        
+        # Thống kê theo mã lộ
+        ma_lo_stats = {}
+        for record in query.all():
+            if record.ma_lo not in ma_lo_stats:
+                ma_lo_stats[record.ma_lo] = {
+                    'total': 0,
+                    'paid': 0,
+                    'count': 0
+                }
+            ma_lo_stats[record.ma_lo]['total'] += record.tong_tien
+            ma_lo_stats[record.ma_lo]['count'] += 1
+            if record.trang_thai == 'Đã thanh toán':
+                ma_lo_stats[record.ma_lo]['paid'] += record.tong_tien
+        
+        return jsonify({
+            'success': True,
+            'statistics': {
+                'total_money': total_money,
+                'total_paid': total_paid,
+                'total_unpaid': total_unpaid,
+                'total_invoices': total_invoices,
+                'total_paid_invoices': total_paid_invoices,
+                'total_unpaid_invoices': total_unpaid_invoices,
+                'ma_lo_stats': ma_lo_stats
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 
 if __name__ == '__main__':
     init_db()
