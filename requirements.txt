@@ -6,3 +6,4 @@ openpyxl
 unidecode
 sqlalchemy
 gunicorn
+requests
