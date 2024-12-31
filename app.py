@@ -369,13 +369,20 @@ def view_data():
             abort(403)
             
         selected_ids = request.form.getlist('selected_ids')
+        deleted_any = False  # Cờ kiểm tra xem có bản ghi nào đã được xóa không
         try:
             for record_id in selected_ids:
                 record = SalesData.query.get(record_id)
                 if record:
+                    # Kiểm tra điều kiện trạng thái
+                    if record.trang_thai == 'Đã thanh toán':
+                        flash(f'Hóa đơn {record_id} đã được thanh toán, không thể xóa.', 'error')
+                        continue  # Bỏ qua việc xóa bản ghi này
                     db.session.delete(record)
-            db.session.commit()
-            flash('Selected records have been deleted successfully.')
+                    deleted_any = True  # Đánh dấu là đã xóa ít nhất 1 bản ghi
+            if deleted_any:  # Chỉ hiển thị thông báo thành công nếu có bản ghi được xóa
+                db.session.commit()
+                flash('Đã xóa thành công.')
         except Exception as e:
             db.session.rollback()
             flash(f'Error deleting records: {str(e)}', 'error')
@@ -695,75 +702,6 @@ def api_get_sales():
             'message': str(e)
         }), 500
 
-@app.route('/api/sales/<int:id>', methods=['GET'])
-def api_get_sale_detail(id):
-    try:
-        if 'username' not in session:
-            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
-        
-        sale = SalesData.query.get_or_404(id)
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'id': sale.id,
-                'stt': sale.stt,
-                'ma_lo': sale.ma_lo,
-                'tt_hd': sale.tt_hd,
-                'ma_khach_hang': sale.ma_khach_hang,
-                'ten_khach_hang': sale.ten_khach_hang,
-                'dia_chi': sale.dia_chi,
-                'kwh': sale.kwh,
-                'tien_dien': sale.tien_dien,
-                'vat': sale.vat,
-                'tong_tien': sale.tong_tien,
-                'trang_thai': sale.trang_thai,
-                'ngay_thu': sale.ngay_thu.strftime('%Y-%m-%d %H:%M:%S') if sale.ngay_thu else None
-            }
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
-
-@app.route('/api/sales/<int:id>/mark_paid', methods=['POST'])
-def api_mark_as_paid(id):
-    try:
-        if 'username' not in session:
-            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
-        
-        sale = SalesData.query.get_or_404(id)
-        sale.trang_thai = 'Đã thanh toán'
-        sale.ngay_thu = datetime.now()
-        db.session.commit()
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
-
-@app.route('/api/sales/<int:id>/cancel_payment', methods=['POST'])
-def api_cancel_payment(id):
-    try:
-        if 'username' not in session:
-            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
-        
-        sale = SalesData.query.get_or_404(id)
-        sale.trang_thai = 'Chưa thanh toán'
-        sale.ngay_thu = None
-        db.session.commit()
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
 
 @app.route('/api/statistics', methods=['GET'])
 def api_get_statistics():
@@ -818,6 +756,119 @@ def api_get_statistics():
     except Exception as e:
         return jsonify({
             'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/data/view', methods=['GET'])
+def api_view_data():
+    if 'username' not in session:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    try:
+        # Lấy thông tin user hiện tại
+        user = User.query.filter_by(username=session['username']).first()
+        
+        # Lấy các tham số tìm kiếm từ query string
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        search_user = request.args.get('search_user', '', type=str)
+        search_ma_lo = request.args.get('search_ma_lo', '', type=str)
+        search_trang_thai = request.args.get('search_trang_thai', '', type=str)  
+        search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str)
+        search_ngay_thu = request.args.get('search_ngay_thu', '', type=str)
+
+        # Xây dựng query cơ bản dựa trên quyền user
+        if user.is_admin:
+            query = SalesData.query
+        else:
+            query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
+
+        # Thêm các điều kiện tìm kiếm
+        if search_user and user.is_admin:
+            query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
+        
+        if search_ma_lo:
+            query = query.filter(SalesData.ma_lo.like(f'%{search_ma_lo}%'))
+
+        if search_trang_thai:
+            query = query.filter(SalesData.trang_thai == search_trang_thai)
+
+        if search_ten_khach_hang:
+            search_pattern = '%'.join(search_ten_khach_hang)
+            query = query.filter(SalesData.ten_khach_hang.ilike(f'%{search_pattern}%'))
+
+        if search_ngay_thu:
+            try:
+                search_date = datetime.strptime(search_ngay_thu, '%Y-%m-%d').date()
+                query = query.filter(
+                    and_(
+                        SalesData.ngay_thu >= search_date,
+                        SalesData.ngay_thu < search_date + timedelta(days=1)
+                    )
+                )
+            except ValueError:
+                return jsonify({'success': False, 'message': 'Invalid date format. Please use YYYY-MM-DD'}), 400
+
+        # Thực hiện phân trang
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        # Tính toán thống kê
+        total_amount = query.with_entities(func.sum(SalesData.tong_tien)).scalar() or 0
+        total_invoices = query.count()
+
+        # Format dữ liệu trả về
+        data = [{
+            'id': item.id,
+            'stt': item.stt,
+            'ma_lo': item.ma_lo,
+            'tt_hd': item.tt_hd,
+            'ma_khach_hang': item.ma_khach_hang,
+            'ten_khach_hang': item.ten_khach_hang,
+            'dia_chi': item.dia_chi,
+            'kwh': item.kwh,
+            'tien_dien': item.tien_dien,
+            'vat': item.vat,
+            'tong_tien': item.tong_tien,
+            'tai_khoan_quan_ly': item.tai_khoan_quan_ly,
+            'trang_thai': item.trang_thai,
+            'ngay_thu': item.ngay_thu.strftime('%Y-%m-%d %H:%M:%S') if item.ngay_thu else None
+        } for item in pagination.items]
+
+        # Lấy danh sách mã lộ cho filter
+        if user.is_admin:
+            ma_lo_query = db.session.query(SalesData.ma_lo).distinct()
+            if search_user:
+                ma_lo_query = ma_lo_query.filter(SalesData.tai_khoan_quan_ly == search_user)
+        else:
+            ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                SalesData.tai_khoan_quan_ly == user.username
+            )
+        ma_lo_list = [item[0] for item in ma_lo_query.all()]
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'items': data,
+                'pagination': {
+                    'current_page': pagination.page,
+                    'total_pages': pagination.pages,
+                    'per_page': per_page,
+                    'total_items': pagination.total
+                },
+                'summary': {
+                    'total_amount': total_amount,
+                    'total_invoices': total_invoices
+                },
+                'filters': {
+                    'ma_lo_list': ma_lo_list,
+                    'trang_thai_list': ['Đã thanh toán', 'Chưa thanh toán']
+                }
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False, 
             'message': str(e)
         }), 500
 
