@@ -640,68 +640,6 @@ def api_logout():
     session.pop('username', None)
     return jsonify({'success': True})
 
-@app.route('/api/sales', methods=['GET'])
-def api_get_sales():
-    try:
-        if 'username' not in session:
-            return jsonify({'success': False, 'message': 'Chưa đăng nhập'}), 401
-        
-        user = User.query.filter_by(username=session['username']).first()
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        search_ma_lo = request.args.get('ma_lo', '')
-        search_trang_thai = request.args.get('trang_thai', '')
-        search_ten_khach_hang = request.args.get('ten_khach_hang', '')
-        
-        # Xây dựng query
-        if user.is_admin:
-            query = SalesData.query
-        else:
-            query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
-        
-        # Áp dụng các bộ lọc
-        if search_ma_lo:
-            query = query.filter(SalesData.ma_lo.like(f'%{search_ma_lo}%'))
-        if search_trang_thai:
-            query = query.filter(SalesData.trang_thai == search_trang_thai)
-        if search_ten_khach_hang:
-            query = query.filter(SalesData.ten_khach_hang.like(f'%{search_ten_khach_hang}%'))
-        
-        # Phân trang
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        total_pages = pagination.pages
-        
-        sales_data = pagination.items
-        return jsonify({
-            'success': True,
-            'data': [{
-                'id': sale.id,
-                'stt': sale.stt,
-                'ma_lo': sale.ma_lo,
-                'tt_hd': sale.tt_hd,
-                'ma_khach_hang': sale.ma_khach_hang,
-                'ten_khach_hang': sale.ten_khach_hang,
-                'dia_chi': sale.dia_chi,
-                'kwh': sale.kwh,
-                'tien_dien': sale.tien_dien,
-                'vat': sale.vat,
-                'tong_tien': sale.tong_tien,
-                'trang_thai': sale.trang_thai,
-                'ngay_thu': sale.ngay_thu.strftime('%Y-%m-%d %H:%M:%S') if sale.ngay_thu else None
-            } for sale in sales_data],
-            'pagination': {
-                'current_page': page,
-                'total_pages': total_pages,
-                'per_page': per_page,
-                'total_items': pagination.total
-            }
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
-
 
 @app.route('/api/statistics', methods=['GET'])
 def api_get_statistics():
@@ -869,6 +807,38 @@ def api_view_data():
     except Exception as e:
         return jsonify({
             'success': False, 
+            'message': str(e)
+        }), 500
+@app.route('/api/invoice/check-payment-status/<int:invoice_id>', methods=['GET'])
+def check_payment_status(invoice_id):
+    if 'username' not in session:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    try:
+        # Lấy thông tin user hiện tại
+        user = User.query.filter_by(username=session['username']).first()
+        
+        # Tìm hóa đơn
+        invoice = SalesData.query.get_or_404(invoice_id)
+        
+        # Kiểm tra quyền truy cập
+        if not user.is_admin and invoice.tai_khoan_quan_ly != user.username:
+            return jsonify({'success': False, 'message': 'Permission denied'}), 403
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'invoice_id': invoice.id,
+                'ma_khach_hang': invoice.ma_khach_hang,
+                'ten_khach_hang': invoice.ten_khach_hang,
+                'trang_thai': invoice.trang_thai,
+                'ngay_thu': invoice.ngay_thu.strftime('%Y-%m-%d %H:%M:%S') if invoice.ngay_thu else None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
             'message': str(e)
         }), 500
 
