@@ -307,8 +307,7 @@ def import_data():
     return render_template('admin/import.html', users=users)
 
     
-    users = User.query.filter_by(is_admin=False).all()  # Lấy danh sách user không phải admin
-    return render_template('admin/import.html', users=users)
+
 
 
 
@@ -550,7 +549,8 @@ def mark_as_paid(id):
     try:
         data = SalesData.query.get_or_404(id)
         data.trang_thai = 'Đã thanh toán'  # Cần thêm cột trạng thái vào model
-        data.ngay_thu = datetime.now()
+        ngay_thu = request.json.get('ngay_thu')
+        data.ngay_thu = datetime.fromisoformat(ngay_thu)
         db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
