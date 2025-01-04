@@ -549,8 +549,7 @@ def mark_as_paid(id):
     try:
         data = SalesData.query.get_or_404(id)
         data.trang_thai = 'Đã thanh toán'  # Cần thêm cột trạng thái vào model
-        ngay_thu = request.json.get('ngay_thu')
-        data.ngay_thu = datetime.fromisoformat(ngay_thu)
+        data.ngay_thu = datetime.now()
         db.session.commit()
         return jsonify({'success': True})
     except Exception as e:

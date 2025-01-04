@@ -257,7 +257,6 @@ function markAsPaid(id) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ ngay_thu: new Date().toISOString() }) // Gửi thời gian ISO từ client
         })
         .then(response => response.json())
         .then(data => {
