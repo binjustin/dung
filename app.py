@@ -316,37 +316,70 @@ def export_data():
     if 'username' not in session:
         return redirect(url_for('login'))
     
+    # Lấy thông tin người dùng đang đăng nhập
     user = User.query.filter_by(username=session['username']).first()
-    
+
+    # Lấy thông tin tìm kiếm từ request
+    search_user = request.args.get('search_user', '', type=str)
+    search_ma_lo = request.args.get('search_ma_lo', '', type=str)
+    search_trang_thai = request.args.get('search_trang_thai', '', type=str)
+    search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str).strip()
+    search_ngay_thu = request.args.get('search_ngay_thu', '', type=str)
+
+    # Tạo truy vấn cơ sở dữ liệu dựa trên quyền người dùng
     if user.is_admin:
         query = SalesData.query
     else:
         query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
+
+    # Áp dụng bộ lọc tìm kiếm
+    if search_user:
+        query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
     
-    # Lấy toàn bộ dữ liệu cần xuất
+    if search_ma_lo:
+        query = query.filter(SalesData.ma_lo.like(f'%{search_ma_lo}%'))
+
+    if search_trang_thai:
+        query = query.filter(SalesData.trang_thai == search_trang_thai)
+
+    if search_ten_khach_hang:
+        search_pattern = '%'.join(search_ten_khach_hang)
+        query = query.filter(SalesData.ten_khach_hang.ilike(f'%{search_pattern}%'))
+
+    if search_ngay_thu:
+        try:
+            search_ngay_thu_date = datetime.strptime(search_ngay_thu, '%Y-%m-%d').date()
+            query = query.filter(SalesData.ngay_thu >= search_ngay_thu_date)
+            query = query.filter(SalesData.ngay_thu < search_ngay_thu_date + timedelta(days=1))
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'error')
+            return redirect(url_for('view_data'))
+
+    # Truy vấn dữ liệu sau khi áp dụng bộ lọc
     data = query.all()
 
-    # Tạo một workbook mới
+    # Tạo file Excel
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Sales Data"
+    ws.title = "Filtered Sales Data"
 
-    # Viết tiêu đề cột
+    # Tiêu đề cột
     ws.append(['STT', 'Mã Lộ', 'Mã Khách Hàng', 'Tên Khách Hàng', 'Địa Chỉ', 'Tổng Tiền', 'Tài Khoản Quản Lý', 'Trạng Thái', 'Ngày thu'])
 
-    # Viết dữ liệu vào các hàng trong Excel
+    # Ghi dữ liệu vào file Excel
     for row in data:
         ws.append([row.stt, row.ma_lo, row.ma_khach_hang, row.ten_khach_hang, row.dia_chi, row.tong_tien, row.tai_khoan_quan_ly, row.trang_thai, row.ngay_thu])
 
-    # Lưu workbook vào một bộ nhớ (BytesIO) để gửi qua Response
+    # Lưu file Excel vào bộ nhớ tạm
     output = BytesIO()
     wb.save(output)
     output.seek(0)
 
-    # Trả về dữ liệu dưới dạng file Excel
+    # Trả về file Excel
     return Response(output.getvalue(), mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={
-        'Content-Disposition': 'attachment; filename=sales_data.xlsx'
+        'Content-Disposition': 'attachment; filename=filtered_sales_data.xlsx'
     })
+
 
 @app.route('/data', methods=['GET', 'POST'])
 def view_data():
