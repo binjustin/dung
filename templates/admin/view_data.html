@@ -82,10 +82,16 @@
         {% if user.is_admin %}
         <div class="mb-2">
             <button type="submit" class="btn btn-sm btn-danger" id="deleteButton">Delete Selected</button>
-                    <!-- Nút Export -->
-            <a href="{{ url_for('export_data') }}" class="btn btn-sm btn-success ml-2">Export to Excel</a>
-        </div>
+                    
         {% endif %}
+        <!-- Nút Export -->
+        <a href="{{ url_for('export_data', search_user=search_user, search_ma_lo=search_ma_lo, search_trang_thai=search_trang_thai, search_ten_khach_hang=search_ten_khach_hang, search_ngay_thu=search_ngay_thu) }}" class="btn btn-sm btn-success ml-2">
+            Export to Excel
+        </a>
+        
+        </div>
+        
+        
         <table class="table table-bordered table-sm">
             <thead>
                 <tr>
