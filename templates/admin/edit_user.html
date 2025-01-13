@@ -17,14 +17,33 @@
                     <label class="form-label">New Password (leave blank to keep current)</label>
                     <input type="password" name="new_password" class="form-control">
                 </div>
-                <div class="mb-3 form-check">
-                    <input type="checkbox" name="is_admin" class="form-check-input" {% if user.is_admin %}checked{% endif %}>
-                    <label class="form-check-label">Is Admin</label>
+                <div class="mb-3">
+                    <label class="form-label">Role</label>
+                    <select name="role" class="form-control" required>
+                        <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
+                        <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Manager</option>
+                        {% if current_user.is_admin %}
+                        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                        {% endif %}
+                    </select>
                 </div>
                 <div class="mb-3 form-check">
                     <input type="checkbox" name="is_active" class="form-check-input" {% if user.is_active %}checked{% endif %}>
                     <label class="form-check-label">Is Active</label>
                 </div>
+                {% if user.role != 'admin' %}
+                <div class="mb-3">
+                    <label class="form-label">Quản lý trực tiếp</label>
+                    <select name="manager_id" class="form-control">
+                        <option value="">Không có</option>
+                        {% for manager in managers %}
+                        <option value="{{ manager.id }}" {% if user.manager_id == manager.id %}selected{% endif %}>
+                            {{ manager.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
                 <button type="submit" class="btn btn-primary">Update User</button>
                 <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back</a>
             </form>

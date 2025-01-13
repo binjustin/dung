@@ -4,169 +4,344 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{% endblock %}</title>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #858796;
+            --success-color: #1cc88a;
+            --info-color: #36b9cc;
+            --warning-color: #f6c23e;
+            --danger-color: #e74a3b;
+            --light-color: #f8f9fc;
+            --dark-color: #5a5c69;
+        }
+
         /* Sidebar */
         .sidebar {
             min-height: 100vh;
-            box-shadow: 0 0 8px rgba(0,0,0,0.1);
-            padding: 10px 5px; /* giảm padding thêm */
+            background-color: #4e73df;
+            background-image: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
+            color: #fff;
+            padding: 1.5rem 1rem;
             position: sticky;
             top: 0;
-            background-color: #f8f9fa;
-            width: 200px; /* giảm chiều rộng của sidebar */
+            width: 230px;
+            z-index: 1;
+            transition: all 0.3s ease;
         }
+
+        .sidebar-brand {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar .nav-item {
+            position: relative;
+            margin-bottom: 0.25rem;
+        }
+
         .sidebar .nav-link {
-            padding: 6px 10px; /* giảm padding hơn nữa */
-            color: #495057;
-            border-radius: 5px;
-            font-size: 0.85rem; /* giảm kích thước font */
+            color: rgba(255,255,255,0.8);
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s;
+            border-radius: 0.35rem;
         }
+
         .sidebar .nav-link:hover {
-            background-color: #e9ecef;
+            color: #fff;
+            background-color: rgba(255,255,255,0.1);
+            padding-left: 1.25rem;
         }
+
         .sidebar .nav-link.active {
-            background-color: #007bff;
-            color: white;
+            color: #fff;
+            background-color: rgba(255,255,255,0.15);
+            font-weight: 600;
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 0.5rem;
+            font-size: 0.85rem;
+            width: 1.5rem;
+            text-align: center;
+        }
+
+        .sidebar h6 {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 1.5rem 0 0.75rem;
+            padding-left: 1rem;
         }
 
         /* Main Content */
         .main-content {
-            padding: 15px;
+            background-color: #f8f9fc;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15);
+            margin: 1rem;
         }
 
         /* Navbar */
         .navbar {
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            padding: 5px 15px; /* giảm padding trong navbar */
-            margin-bottom: 10px;
+            background-color: #fff;
+            box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15);
+            padding: 0.5rem 1rem;
         }
-        .navbar .navbar-brand {
-            font-size: 1rem; /* giảm kích thước chữ logo */
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--dark-color);
         }
-        .navbar .btn {
-            margin-left: 6px;
-            padding: 4px 8px; /* giảm padding của nút */
-            font-size: 0.85rem; /* giảm kích thước font */
-            border-radius: 4px; /* giảm border radius */
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            color: var(--dark-color);
+            text-decoration: none;
+            border-radius: 0.35rem;
+        }
+
+        .user-profile:hover {
+            background-color: var(--light-color);
+        }
+
+        .user-profile img {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        /* Tables */
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table thead th {
+            background-color: var(--light-color);
+            border-bottom: 2px solid #e3e6f0;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--dark-color);
+            padding: 0.75rem;
+        }
+
+        .table td {
+            vertical-align: middle;
+            font-size: 0.9rem;
+            padding: 0.75rem;
+            color: var(--secondary-color);
+        }
+
+        /* Buttons */
+        .btn {
+            font-size: 0.85rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.35rem;
+            font-weight: 500;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
         }
 
         /* Alerts */
         .alert {
-            margin-bottom: 15px;
-            border-radius: 8px;
+            border: none;
+            border-radius: 0.35rem;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
         }
 
-        /* General Layout */
-        .container-fluid {
-            background-color: #f1f3f5;
-        }
-
-        h5, h6 {
-            font-weight: 600;
-        }
-
-        /* Optional: Add some custom padding to the top */
-        .container-fluid {
-            padding-top: 15px;
-        }
-        table th, table td{
-            font-size: 0.8rem; /* Giảm kích thước font */
-        }
-
-        /* Điều chỉnh các nút trong bảng cho nhỏ hơn */
-        .btn-sm {
-            font-size: 0.7rem; /* Giảm kích thước font trong các nút */
-            padding: 0.25rem 0.5rem; /* Điều chỉnh padding để nút nhỏ gọn hơn */
-        }
-        
-        /* Điều chỉnh kích thước của các ô trong bảng */
-        table {
-            width: 100%;
-            table-layout: auto; /* Cố định độ rộng của các cột */
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+            }
             
+            .main-content {
+                margin: 0.5rem;
+            }
         }
 
-        td, th {
-            padding: 0.3rem 0.6rem; /* Giảm padding trong các ô để làm cho chúng nhỏ gọn hơn */
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 0.4rem;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 0.2rem;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #224abe;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
+    <div class="container-fluid p-0">
+        <div class="row g-0">
             {% if 'username' in session %}
-            <div class="col-md-3 sidebar">
-                <h5 class="mb-3 text-dark">Menu</h5>
-                <div class="nav flex-column">
-                    <a class="nav-link" href="{{ url_for('dashboard') }}">
-                        <i class="bi bi-house-door"></i> Dashboard
-                    </a>
-                    <a class="nav-link" href="{{ url_for('profile') }}">
-                        <i class="bi bi-person"></i> Profile
-                    </a>
-                    
-                    {% if user and user.is_admin %}
-                    <h6 class="mt-3 mb-2">Admin Management</h6>
-                    <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
-                        <i class="bi bi-person-check"></i> Quản lý tài khoản
-                    </a>
-                    <a class="nav-link" href="{{ url_for('import_data') }}">
-                        <i class="bi bi-cloud-arrow-up"></i> Import Data
-                    </a>
-                    {% endif %}
+            <!-- Sidebar -->
+            <div class="col-auto">
+                <div class="sidebar">
+                    <div class="sidebar-brand">
+                        <h5 class="m-0">
+                            <i class="fas fa-laugh-wink me-2"></i>
+                            Admin Panel
+                        </h5>
+                    </div>
 
-                    <h6 class="mt-3 mb-2">Data Management</h6>
-                    <a class="nav-link" href="{{ url_for('view_data') }}">
-                        <i class="bi bi-table"></i> View Data
-                    </a>
-                    <a class="nav-link" href="{{ url_for('report') }}">
-                        <i class="bi bi-table"></i> Báo Cáo
-                    </a>
-                    
-                    <h6 class="mt-3 mb-2">Account</h6>
-                    <a class="nav-link" href="{{ url_for('logout') }}">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
+                    <div class="nav flex-column">
+                        <h6>Core</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-fw fa-tachometer-alt"></i>
+                                Dashboard
+                            </a>
+                        </div>
+                        
+
+                        {% if user and (user.is_admin) %}
+                        <h6>Administration</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                                <i class="fas fa-fw fa-users-cog"></i>
+                                Quản lý tài khoản
+                            </a>
+                        </div>
+                        
+                        {% endif %}
+
+                        <h6>Data</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('import_data') }}">
+                                <i class="fas fa-fw fa-file-import"></i>
+                                Import Data
+                            </a>
+                        </div>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('view_data') }}">
+                                <i class="fas fa-fw fa-table"></i>
+                                View Data
+                            </a>
+                        </div>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('report') }}">
+                                <i class="fas fa-fw fa-chart-area"></i>
+                                Reports
+                            </a>
+                        </div>
+
+                        <h6>Account</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('profile') }}">
+                                <i class="fas fa-fw fa-user"></i>
+                                Profile
+                            </a>
+                        </div>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="fas fa-fw fa-sign-out-alt"></i>
+                                Logout
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
             {% endif %}
-            
+
+            <!-- Main Content -->
             <div class="col">
-                <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <!-- Navbar -->
+                <nav class="navbar navbar-expand-lg">
                     <div class="container-fluid">
-                        <a class="navbar-brand" href="{{ url_for('index') }}">My App</a>
-                        {% if not 'username' in session %}
-                        <div class="d-flex">
-                            <a class="btn btn-outline-primary me-2" href="{{ url_for('login') }}">Login</a>
-                            <a class="btn btn-primary" href="{{ url_for('register') }}">Register</a>
+                        <button class="btn btn-link d-md-none rounded-circle me-3">
+                            <i class="fas fa-bars"></i>
+                        </button>
+
+                        {% if 'username' in session %}
+                        <div class="ms-auto">
+                            <div class="user-profile">
+                                <img src="https://ui-avatars.com/api/?name={{ session['username'] }}&background=random" alt="Profile">
+                                <span>{{ session['username'] }}</span>
+                            </div>
                         </div>
+                        {% else %}
+                        
                         {% endif %}
                     </div>
                 </nav>
 
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show mx-3 mt-3">
+                                <i class="fas fa-info-circle me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Page Content -->
                 <div class="main-content">
-                    {% with messages = get_flashed_messages() %}
-                        {% if messages %}
-                            {% for message in messages %}
-                                <div class="alert alert-info alert-dismissible fade show">
-                                    {{ message }}
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                    
                     {% block content %}{% endblock %}
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Highlight active menu
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+
+        // Toggle sidebar on mobile
+        const sidebarToggle = document.querySelector('.btn-link');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', e => {
+                e.preventDefault();
+                document.querySelector('.sidebar').classList.toggle('toggled');
+            });
+        }
+    });
+    </script>
+
     {% block script %}{% endblock %}
 </body>
 </html>

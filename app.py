@@ -57,14 +57,29 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)  # Thêm trường is_admin
-    is_active = db.Column(db.Boolean, default=True)  # Thêm trường để khóa/mở khóa tài khoản
+    role = db.Column(db.String(20), default='user')  # Đảm bảo column này tồn tại
+    is_active = db.Column(db.Boolean, default=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Quan hệ với users dưới quyền
+    subordinates = db.relationship('User', 
+                                 backref=db.backref('manager', remote_side=[id]),
+                                 lazy='dynamic',
+                                 foreign_keys=[manager_id])
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+    @property
+    def is_admin(self):
+        return self.role == 'admin'
+    
+    @property
+    def is_manager(self):
+        return self.role == 'manager'
 
 def init_db():
     with app.app_context():
@@ -73,7 +88,7 @@ def init_db():
             return unidecode(string) if string else None
         
         # Đăng ký function với SQLite
-        engine = db.get_engine()
+        engine = db.engine  # Sử dụng .engine thay vì .get_engine()
         engine.connect().connection.create_function("unidecode", 1, sqlite_unidecode)
         
         # Tạo bảng và admin
@@ -93,15 +108,27 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-
+def manager_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return redirect(url_for('login'))
+        
+        user = User.query.filter_by(username=session['username']).first()
+        if not user or not (user.is_admin or user.is_manager):
+            abort(403)  # Forbidden
+        return f(*args, **kwargs)
+    return decorated_function
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('403.html'), 403
 
 @app.route('/')
 def index():
-    if 'username' in session:
-        return redirect(url_for('dashboard'))
     return render_template('index.html')
 
 @app.route('/register', methods=['GET', 'POST'])
+@admin_required
 def register():
     if request.method == 'POST':
         username = request.form['username']
@@ -143,30 +170,62 @@ def admin_dashboard():
 @admin_required
 def admin_edit_user(user_id):
     user = User.query.get_or_404(user_id)
+    current_user = User.query.filter_by(username=session['username']).first()
     
     if request.method == 'POST':
-        email = request.form['email']
-        is_admin = 'is_admin' in request.form
-        is_active = 'is_active' in request.form
-        new_password = request.form['new_password']
+        try:
+            # In ra form data để debug
+            print("Form data received:", request.form)
+            
+            email = request.form['email']
+            role = request.form['role']
+            manager_id = request.form.get('manager_id')
+            is_active = 'is_active' in request.form
+            new_password = request.form['new_password']
 
-        if email != user.email:
-            if User.query.filter_by(email=email).first():
-                flash('Email already exists')
-                return redirect(url_for('admin_edit_user', user_id=user_id))
+            print(f"Current user role: {user.role}")
+            print(f"New role from form: {role}")
+
+            # Cập nhật thông tin
             user.email = email
+            user.role = role  # Cập nhật role trực tiếp
+            user.is_active = is_active
 
-        if new_password:
-            user.set_password(new_password)
+            if new_password:
+                user.set_password(new_password)
 
-        user.is_admin = is_admin
-        user.is_active = is_active
-        
-        db.session.commit()
-        flash('User updated successfully')
-        return redirect(url_for('admin_dashboard'))
+            if role != 'admin':
+                user.manager_id = int(manager_id) if manager_id else None
+            else:
+                user.manager_id = None
+
+            # Commit changes
+            db.session.add(user)  # Thêm dòng này
+            db.session.commit()
+
+            # Verify changes
+            db.session.refresh(user)  # Thêm dòng này
+            print(f"Role after update: {user.role}")
+
+            flash('Cập nhật user thành công')
+            return redirect(url_for('admin_dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error updating user: {str(e)}")
+            flash(f'Lỗi khi cập nhật user: {str(e)}')
+            return redirect(url_for('admin_edit_user', user_id=user_id))
     
-    return render_template('admin/edit_user.html', user=user)
+    # GET request
+    managers = User.query.filter(
+        User.role.in_(['admin', 'manager']),
+        User.id != user_id
+    ).all()
+    
+    return render_template('admin/edit_user.html', 
+                         user=user, 
+                         current_user=current_user,
+                         managers=managers)
 
 @app.route('/admin/user/<int:user_id>/delete', methods=['POST'])
 @admin_required
@@ -242,8 +301,9 @@ def profile():
     return render_template('profile.html', user=user)
 
 @app.route('/admin/import', methods=['GET', 'POST'])
-@admin_required
+@manager_required  # Cho phép cả admin và manager
 def import_data():
+    user = User.query.filter_by(username=session['username']).first()
     if request.method == 'POST':
         if 'file' not in request.files:
             flash('No file part')
@@ -260,6 +320,13 @@ def import_data():
             flash('Please select a user to manage this data')
             return redirect(request.url)
         
+        # Kiểm tra quyền của manager
+        if not user.is_admin:
+            subordinate_usernames = [u.username for u in user.subordinates]
+            if selected_user not in subordinate_usernames and selected_user != user.username:
+                flash('Không có quyền assign dữ liệu cho user này')
+                return redirect(request.url)
+        
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -268,43 +335,81 @@ def import_data():
             try:
                 df = pd.read_excel(filepath)
                 
+                # Kiểm tra các cột bắt buộc
+                required_columns = ['STT', 'Mã lộ', 'TT HĐ', 'Mã Khách hàng', 
+                                  'Tên Khách hàng', 'Địa chỉ', 'Kwh', 
+                                  'Tiền điện', 'VAT', 'Tổng tiền']
+                
+                missing_columns = [col for col in required_columns if col not in df.columns]
+                if missing_columns:
+                    flash(f'File thiếu các cột: {", ".join(missing_columns)}')
+                    os.remove(filepath)
+                    return redirect(url_for('import_data'))
+                
                 for index, row in df.iterrows():
-                    existing_data = SalesData.query.filter_by(ma_khach_hang=row['Mã Khách hàng']).first()
+                    # Kiểm tra dữ liệu trùng lặp
+                    existing_data = SalesData.query.filter_by(
+                        ma_khach_hang=str(row['Mã Khách hàng']),
+                        ma_lo=str(row['Mã lộ'])
+                    ).first()
                     
                     if existing_data:
-                        flash(f"Customer with 'Mã Khách hàng' {row['Mã Khách hàng']} already exists.")
-                        return redirect(url_for('import_data'))
+                        flash(f"Dữ liệu của khách hàng {row['Mã Khách hàng']} - Mã lộ {row['Mã lộ']} đã tồn tại.")
+                        continue
                     
-                    # Gán giá trị mặc định cho 'trang_thai'
-                    trang_thai = 'Chưa thanh toán'  # Giá trị mặc định nếu không có trong file Excel
+                    try:
+                        # Chuyển đổi và kiểm tra dữ liệu số
+                        tien_dien = float(row['Tiền điện'])
+                        vat = float(row['VAT'])
+                        tong_tien = float(row['Tổng tiền'])
+                    except (ValueError, TypeError):
+                        flash(f'Lỗi dữ liệu số tại dòng {index + 2}')
+                        continue
                     
+                    # Tạo bản ghi mới
                     data = SalesData(
                         stt=row['STT'],
-                        ma_lo=row['Mã lộ'],
-                        tt_hd=row['TT HĐ'],
-                        ma_khach_hang=row['Mã Khách hàng'],
-                        ten_khach_hang=row['Tên Khách hàng'],
-                        dia_chi=row['Địa chỉ'],
-                        kwh=row['Kwh'],
-                        tien_dien=float(row['Tiền điện']),
-                        vat=float(row['VAT']),
-                        tong_tien=float(row['Tổng tiền']),
+                        ma_lo=str(row['Mã lộ']),
+                        tt_hd=str(row['TT HĐ']),
+                        ma_khach_hang=str(row['Mã Khách hàng']),
+                        ten_khach_hang=str(row['Tên Khách hàng']),
+                        dia_chi=str(row['Địa chỉ']),
+                        kwh=str(row['Kwh']),
+                        tien_dien=tien_dien,
+                        vat=vat,
+                        tong_tien=tong_tien,
                         tai_khoan_quan_ly=selected_user,
-                        trang_thai=trang_thai  # Gán giá trị vào cột 'trang_thai'
+                        trang_thai='Chưa thanh toán'
                     )
                     db.session.add(data)
+                
                 db.session.commit()
-                flash('Data imported successfully')
-                os.remove(filepath)
+                flash('Import dữ liệu thành công')
                 
             except Exception as e:
                 db.session.rollback()
-                flash(f'Error importing data: {str(e)}')
+                flash(f'Lỗi khi import dữ liệu: {str(e)}')
+            finally:
+                # Xóa file tạm sau khi xử lý xong
+                if os.path.exists(filepath):
+                    os.remove(filepath)
                 
             return redirect(url_for('view_data'))
     
-    users = User.query.filter_by(is_admin=False).all()  # Lấy danh sách user không phải admin
+    # Lấy danh sách users cho form dựa trên quyền
+    if user.is_admin:
+        # Admin có thể assign cho tất cả users
+        users = User.query.filter(User.role != 'admin').all()
+    else:
+        # Manager chỉ có thể assign cho users dưới quyền
+        users = list(user.subordinates)
+    
     return render_template('admin/import.html', users=users)
+
+# Hàm kiểm tra file extension
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
     
 
@@ -380,12 +485,116 @@ def export_data():
         'Content-Disposition': 'attachment; filename=filtered_sales_data.xlsx'
     })
 
+def get_hierarchical_users():
+    """Hàm lấy danh sách users theo cấp bậc"""
+    # Lấy tất cả managers (không bao gồm admin)
+    managers = User.query.filter_by(role='manager').all()
+    
+    hierarchical_users = []
+    
+    for manager in managers:
+        # Thêm manager
+        hierarchical_users.append({
+            'id': manager.id,
+            'username': manager.username,
+            'role': 'manager',
+            'level': 0  # Level 0 cho manager
+        })
+        
+        # Thêm các users dưới quyền của manager
+        for user in manager.subordinates:
+            if user.role == 'user':  # Chỉ lấy user thường
+                hierarchical_users.append({
+                    'id': user.id,
+                    'username': user.username,
+                    'role': 'user',
+                    'level': 1,  # Level 1 cho user dưới quyền
+                    'manager': manager.username
+                })
+    
+    # Thêm các user không có manager
+    independent_users = User.query.filter(
+        User.role == 'user',
+        User.manager_id.is_(None)
+    ).all()
+    
+    for user in independent_users:
+        hierarchical_users.append({
+            'id': user.id,
+            'username': user.username,
+            'role': 'user',
+            'level': 0,  # Level 0 cho user độc lập
+            'manager': None
+        })
+    
+    return hierarchical_users
+
 
 @app.route('/data', methods=['GET', 'POST'])
 def view_data():
     if 'username' not in session:
         return redirect(url_for('login'))
     
+    user = User.query.filter_by(username=session['username']).first()
+    
+    # Chuẩn bị danh sách users có cấu trúc phân cấp
+    if user.is_admin:
+        # Lấy tất cả managers
+        managers = User.query.filter_by(role='manager').all()
+        users_list = []
+        
+        # Thêm managers và users của họ
+        for manager in managers:
+            # Thêm manager
+            users_list.append({
+                'username': manager.username,
+                'role': 'manager',
+                'manager_username': None
+            })
+            
+            # Thêm users của manager này
+            for sub_user in manager.subordinates:
+                users_list.append({
+                    'username': sub_user.username,
+                    'role': 'user',
+                    'manager_username': manager.username
+                })
+        
+        # Thêm users không có manager
+        independent_users = User.query.filter(
+            User.role == 'user',
+            User.manager_id.is_(None)
+        ).all()
+        
+        for ind_user in independent_users:
+            users_list.append({
+                'username': ind_user.username,
+                'role': 'user',
+                'manager_username': None
+            })
+            
+    elif user.is_manager:
+        # Tạo danh sách bắt đầu với manager
+        users_list = [{
+            'username': user.username,
+            'role': 'manager',
+            'manager_username': None
+        }]
+        
+        # Thêm users dưới quyền của manager
+        users_list.extend([{
+            'username': sub_user.username,
+            'role': 'user',
+            'manager_username': user.username
+        } for sub_user in user.subordinates])
+    else:
+        # User thường chỉ thấy chính mình
+        users_list = [{
+            'username': user.username,
+            'role': 'user',
+            'manager_username': None
+        }]
+
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     search_user = request.args.get('search_user', '', type=str)
@@ -393,25 +602,33 @@ def view_data():
     search_trang_thai = request.args.get('search_trang_thai', '', type=str)
     search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str).strip()
     search_ngay_thu = request.args.get('search_ngay_thu', '', type=str)
-    
-    user = User.query.filter_by(username=session['username']).first()
-    
+
     if request.method == 'POST':
-        if not user.is_admin:
+        # Kiểm tra nếu user không phải admin và không phải manager thì không cho xóa
+        if not (user.is_admin or user.is_manager):
             abort(403)
-            
+        
         selected_ids = request.form.getlist('selected_ids')
         deleted_any = False  # Cờ kiểm tra xem có bản ghi nào đã được xóa không
         try:
             for record_id in selected_ids:
                 record = SalesData.query.get(record_id)
                 if record:
+                    # Nếu là manager, chỉ cho phép xóa dữ liệu của users dưới quyền
+                    if user.is_manager and not user.is_admin:
+                        subordinate_usernames = [u.username for u in user.subordinates]
+                        if record.tai_khoan_quan_ly not in subordinate_usernames:
+                            flash(f'Không có quyền xóa hóa đơn {record_id}', 'error')
+                            continue
+
                     # Kiểm tra điều kiện trạng thái
                     if record.trang_thai == 'Đã thanh toán':
                         flash(f'Hóa đơn {record_id} đã được thanh toán, không thể xóa.', 'error')
                         continue  # Bỏ qua việc xóa bản ghi này
+                    
                     db.session.delete(record)
                     deleted_any = True  # Đánh dấu là đã xóa ít nhất 1 bản ghi
+                    
             if deleted_any:  # Chỉ hiển thị thông báo thành công nếu có bản ghi được xóa
                 db.session.commit()
                 flash('Đã xóa thành công.')
@@ -420,36 +637,49 @@ def view_data():
             flash(f'Error deleting records: {str(e)}', 'error')
         return redirect(url_for('view_data', page=page, per_page=per_page))
     
-    if user.is_admin:
-        query = SalesData.query
-    else:
-        query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
-    
+    # Xây dựng query cơ bản
+    query = SalesData.query
+
+    # Xử lý tìm kiếm theo tài khoản quản lý
     if search_user:
-        query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
-    
+        if User.query.filter_by(username=search_user, role='manager').first():
+            # Nếu tìm theo manager, chỉ lấy dữ liệu của users dưới quyền
+            manager = User.query.filter_by(username=search_user).first()
+            subordinate_usernames = [u.username for u in manager.subordinates]
+            query = query.filter(SalesData.tai_khoan_quan_ly.in_(subordinate_usernames))
+        else:
+            # Nếu tìm theo user thường
+            query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
+    elif not user.is_admin:  # Nếu không có tìm kiếm và không phải admin
+        if user.is_manager:
+            # Manager sẽ thấy dữ liệu của các user dưới quyền
+            subordinate_usernames = [u.username for u in user.subordinates]
+            query = query.filter(SalesData.tai_khoan_quan_ly.in_(subordinate_usernames))
+        else:
+            # User thường chỉ thấy dữ liệu của mình
+            query = query.filter(SalesData.tai_khoan_quan_ly == user.username)
+
+    # Áp dụng các điều kiện tìm kiếm khác
     if search_ma_lo:
         query = query.filter(SalesData.ma_lo.like(f'%{search_ma_lo}%'))
 
     if search_trang_thai:
         query = query.filter(SalesData.trang_thai == search_trang_thai)
 
-
     if search_ten_khach_hang:
-        # Chuyển chuỗi tìm kiếm thành một chuỗi với ký tự % cho mỗi ký tự
-        search_pattern = '%'.join(search_ten_khach_hang)  # %a%b%c%
+        search_pattern = '%'.join(search_ten_khach_hang)
         query = query.filter(SalesData.ten_khach_hang.ilike(f'%{search_pattern}%'))
 
     if search_ngay_thu:
         try:
-            # Chuyển đổi chuỗi ngày thành đối tượng datetime
             search_ngay_thu_date = datetime.strptime(search_ngay_thu, '%Y-%m-%d').date()
-            # Lọc theo ngày (bỏ phần giờ)
-            query = query.filter(SalesData.ngay_thu >= search_ngay_thu_date)
-            query = query.filter(SalesData.ngay_thu < search_ngay_thu_date + timedelta(days=1))
+            query = query.filter(
+                SalesData.ngay_thu >= search_ngay_thu_date,
+                SalesData.ngay_thu < search_ngay_thu_date + timedelta(days=1)
+            )
         except ValueError:
-            # Nếu ngày không hợp lệ, không lọc theo ngày thu
             flash('Invalid date format. Please use YYYY-MM-DD.', 'error')
+
     try:
         # Phân trang dữ liệu
         data = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -458,25 +688,61 @@ def view_data():
         total_amount = query.with_entities(db.func.sum(SalesData.tong_tien)).scalar() or 0
         
         # Tính tổng số hóa đơn
-        total_invoices = query.count()  # Đếm số bản ghi
-        
-        # Lấy danh sách users
-        users = User.query.filter_by(is_admin=False).all()
+        total_invoices = query.count()
         
         # Lấy danh sách mã lộ
         if user.is_admin:
-            ma_lo_query = db.session.query(SalesData.ma_lo).distinct()
-            if search_user:
-                ma_lo_query = ma_lo_query.filter(SalesData.tai_khoan_quan_ly == search_user)
+            if search_user:  # Nếu đã chọn user cụ thể
+                selected_user = User.query.filter_by(username=search_user).first()
+                if selected_user:
+                    if selected_user.role == 'manager':
+                        # Nếu chọn manager, lấy mã lộ của tất cả user dưới quyền
+                        subordinate_usernames = [u.username for u in selected_user.subordinates]
+                        ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                            SalesData.tai_khoan_quan_ly.in_(subordinate_usernames)
+                        )
+                    else:
+                        # Nếu chọn user thường, chỉ lấy mã lộ của user đó
+                        ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                            SalesData.tai_khoan_quan_ly == search_user
+                        )
+            else:
+                # Nếu không chọn user, lấy tất cả mã lộ
+                ma_lo_query = db.session.query(SalesData.ma_lo).distinct()
+
+        elif user.is_manager:
+            subordinate_usernames = [u.username for u in user.subordinates]
+            if search_user and search_user in subordinate_usernames:
+                # Nếu manager chọn một user cụ thể trong nhóm của mình
+                ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                    SalesData.tai_khoan_quan_ly == search_user
+                )
+            else:
+                # Nếu không chọn user cụ thể, lấy mã lộ của tất cả user dưới quyền
+                ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                    SalesData.tai_khoan_quan_ly.in_(subordinate_usernames)
+                )
         else:
-            ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(SalesData.tai_khoan_quan_ly == user.username)
-        
+            # User thường chỉ thấy mã lộ của mình
+            ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                SalesData.tai_khoan_quan_ly == user.username
+            )
+
         ma_lo_list = [item[0] for item in ma_lo_query.all()]
         
-        return render_template('admin/view_data.html', data=data, per_page=per_page, user=user, users=users, 
-                               search_user=search_user, search_ma_lo=search_ma_lo, ma_lo_list=ma_lo_list,
-                               search_trang_thai=search_trang_thai, search_ten_khach_hang=search_ten_khach_hang, search_ngay_thu=search_ngay_thu, total_amount=total_amount,
-                               total_invoices=total_invoices)  # Truyền thêm tổng số hóa đơn
+        return render_template('admin/view_data.html',
+                         user=user,
+                         users=users_list,
+                         data=data,
+                         search_user=search_user,
+                         search_ma_lo=search_ma_lo,
+                         ma_lo_list=ma_lo_list,
+                         search_trang_thai=search_trang_thai,
+                         search_ten_khach_hang=search_ten_khach_hang,
+                         search_ngay_thu=search_ngay_thu,
+                         total_amount=total_amount,
+                         total_invoices=total_invoices,
+                         per_page=per_page)
     except Exception as e:
         flash(f'Error loading data: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
@@ -486,83 +752,79 @@ def report():
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    current_user = User.query.filter_by(username=session['username']).first()
+    user = User.query.filter_by(username=session['username']).first()
+    
+    # Khởi tạo biến users
+    users = []
+    
+    # Lấy thông tin tìm kiếm từ request
     search_user = request.args.get('search_user', '', type=str)
-    
-    query = SalesData.query
-    
-    if current_user.is_admin:
-        if search_user:
-            query = query.filter_by(tai_khoan_quan_ly=search_user)
-        users = User.query.filter_by(is_admin=False).all()
+    search_ma_lo = request.args.get('search_ma_lo', '', type=str)
+    search_trang_thai = request.args.get('search_trang_thai', '', type=str)
+    search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str).strip()
+    search_ngay_thu = request.args.get('search_ngay_thu', '', type=str)
+
+    # Xây dựng query dựa trên role
+    if user.is_admin:
+        # Admin xem tất cả dữ liệu
+        query = SalesData.query
+        # Lấy danh sách tất cả users cho admin
+        users = User.query.filter(User.role != 'admin').all()
+    elif user.is_manager:
+        # Manager xem dữ liệu của mình và của users dưới quyền
+        subordinate_usernames = [u.username for u in user.subordinates]
+        subordinate_usernames.append(user.username)
+        query = SalesData.query.filter(SalesData.tai_khoan_quan_ly.in_(subordinate_usernames))
+        # Lấy danh sách users dưới quyền cho manager
+        users = list(user.subordinates)
     else:
-        query = query.filter_by(tai_khoan_quan_ly=current_user.username)
-        users = []
-        search_user = current_user.username
+        # User thường chỉ xem dữ liệu của mình
+        query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
 
-    report_data = query.all()
+    # Áp dụng các điều kiện tìm kiếm
+    if search_user and (user.is_admin or user.is_manager):
+        query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
+    if search_ma_lo:
+        query = query.filter(SalesData.ma_lo.ilike(f'%{search_ma_lo}%'))
+    if search_trang_thai:
+        query = query.filter(SalesData.trang_thai == search_trang_thai)
+    if search_ten_khach_hang:
+        query = query.filter(SalesData.ten_khach_hang.ilike(f'%{search_ten_khach_hang}%'))
+    if search_ngay_thu:
+        try:
+            ngay_thu = datetime.strptime(search_ngay_thu, '%Y-%m-%d')
+            query = query.filter(
+                func.date(SalesData.ngay_thu) == ngay_thu.date()
+            )
+        except ValueError:
+            flash('Định dạng ngày không hợp lệ')
 
-    # Tính toán số liệu cơ bản
-    total_money = sum([record.tong_tien for record in report_data])
-    total_paid_money = sum([record.tong_tien for record in report_data if record.trang_thai == 'Đã thanh toán'])
-    total_unpaid_money = sum([record.tong_tien for record in report_data if record.trang_thai == 'Chưa thanh toán'])
+    # Thực hiện query và tính toán thống kê
+    all_data = query.all()
     
-    total_invoices = len(report_data)
-    total_paid_invoices = len([record for record in report_data if record.trang_thai == 'Đã thanh toán'])
-    total_unpaid_invoices = len([record for record in report_data if record.trang_thai == 'Chưa thanh toán'])
-
-    # Tính toán dữ liệu cho biểu đồ theo ngày
-    daily_stats = {}
-    for record in report_data:
-        if record.ngay_thu:
-            date_str = record.ngay_thu.strftime('%Y-%m-%d')
-            if date_str not in daily_stats:
-                daily_stats[date_str] = {'paid': 0, 'count': 0}
-            daily_stats[date_str]['paid'] += record.tong_tien
-            daily_stats[date_str]['count'] += 1
-
-    # Sắp xếp theo ngày và lấy 7 ngày gần nhất
-    chart_dates = sorted(daily_stats.keys(), reverse=True)[:7]
-    chart_dates.reverse()  # Đảo ngược lại để hiển thị theo thứ tự thời gian
+    # Tính toán thống kê
+    total_money = sum(data.tong_tien for data in all_data)
+    total_paid_money = sum(data.tong_tien for data in all_data if data.trang_thai == 'Đã thanh toán')
+    total_unpaid_money = sum(data.tong_tien for data in all_data if data.trang_thai == 'Chưa thanh toán')
     
-    chart_data = {
-        'dates': chart_dates,
-        'amounts': [daily_stats[date]['paid'] for date in chart_dates],
-        'counts': [daily_stats[date]['count'] for date in chart_dates]
-    }
+    total_invoices = len(all_data)
+    total_paid_invoices = len([data for data in all_data if data.trang_thai == 'Đã thanh toán'])
+    total_unpaid_invoices = len([data for data in all_data if data.trang_thai == 'Chưa thanh toán'])
 
-    # Tính tỷ lệ thu tiền theo mã lộ
-    ma_lo_stats = {}
-    for record in report_data:
-        if record.ma_lo not in ma_lo_stats:
-            ma_lo_stats[record.ma_lo] = {
-                'total': 0,
-                'paid': 0
-            }
-        ma_lo_stats[record.ma_lo]['total'] += record.tong_tien
-        if record.trang_thai == 'Đã thanh toán':
-            ma_lo_stats[record.ma_lo]['paid'] += record.tong_tien
-
-    pie_chart_data = {
-        'labels': list(ma_lo_stats.keys()),
-        'paid_percentages': [
-            round((stats['paid'] / stats['total'] * 100), 2) if stats['total'] > 0 else 0 
-            for stats in ma_lo_stats.values()
-        ]
-    }
-
-    return render_template('report.html', 
+    return render_template('report.html',
+                         user=user,
+                         users=users,
                          total_money=total_money,
                          total_paid_money=total_paid_money,
                          total_unpaid_money=total_unpaid_money,
                          total_invoices=total_invoices,
                          total_paid_invoices=total_paid_invoices,
                          total_unpaid_invoices=total_unpaid_invoices,
-                         users=users,
                          search_user=search_user,
-                         is_admin=current_user.is_admin,
-                         chart_data=chart_data,
-                         pie_chart_data=pie_chart_data)
+                         search_ma_lo=search_ma_lo,
+                         search_trang_thai=search_trang_thai,
+                         search_ten_khach_hang=search_ten_khach_hang,
+                         search_ngay_thu=search_ngay_thu)
 
 
 
@@ -610,17 +872,17 @@ def cancel_mark_as_paid(id):
 
 # Tạo tài khoản admin đầu tiên
 def create_admin():
-    with app.app_context():
-        admin = User.query.filter_by(username='admin').first()
-        if not admin:
-            admin = User(
-                username='admin',
-                email='admin@example.com',
-                is_admin=True
-            )
-            admin.set_password('admin123')  # Đổi mật khẩu này sau khi tạo xong
-            db.session.add(admin)
-            db.session.commit()
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='admin@example.com',
+            role='admin',  # Set role thay vì is_admin
+            is_active=True
+        )
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
 
 # API Endpoints
 @app.route('/api/login', methods=['POST'])
@@ -744,19 +1006,32 @@ def api_view_data():
         search_user = request.args.get('search_user', '', type=str)
         search_ma_lo = request.args.get('search_ma_lo', '', type=str)
         search_trang_thai = request.args.get('search_trang_thai', '', type=str)  
-        search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str)
+        search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str).strip()
         search_ngay_thu = request.args.get('search_ngay_thu', '', type=str)
 
-        # Xây dựng query cơ bản dựa trên quyền user
-        if user.is_admin:
-            query = SalesData.query
-        else:
-            query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
+        # Xây dựng query cơ bản
+        query = SalesData.query
 
-        # Thêm các điều kiện tìm kiếm
-        if search_user and user.is_admin:
-            query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
-        
+        # Xử lý tìm kiếm theo tài khoản quản lý
+        if search_user:
+            if User.query.filter_by(username=search_user, role='manager').first():
+                # Nếu tìm theo manager, chỉ lấy dữ liệu của users dưới quyền
+                manager = User.query.filter_by(username=search_user).first()
+                subordinate_usernames = [u.username for u in manager.subordinates]
+                query = query.filter(SalesData.tai_khoan_quan_ly.in_(subordinate_usernames))
+            else:
+                # Nếu tìm theo user thường
+                query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
+        elif not user.is_admin:  # Nếu không có tìm kiếm và không phải admin
+            if user.is_manager:
+                # Manager sẽ thấy dữ liệu của các user dưới quyền
+                subordinate_usernames = [u.username for u in user.subordinates]
+                query = query.filter(SalesData.tai_khoan_quan_ly.in_(subordinate_usernames))
+            else:
+                # User thường chỉ thấy dữ liệu của mình
+                query = query.filter(SalesData.tai_khoan_quan_ly == user.username)
+
+        # Áp dụng các điều kiện tìm kiếm khác
         if search_ma_lo:
             query = query.filter(SalesData.ma_lo.like(f'%{search_ma_lo}%'))
 
@@ -806,14 +1081,89 @@ def api_view_data():
 
         # Lấy danh sách mã lộ cho filter
         if user.is_admin:
-            ma_lo_query = db.session.query(SalesData.ma_lo).distinct()
             if search_user:
-                ma_lo_query = ma_lo_query.filter(SalesData.tai_khoan_quan_ly == search_user)
+                selected_user = User.query.filter_by(username=search_user).first()
+                if selected_user:
+                    if selected_user.role == 'manager':
+                        subordinate_usernames = [u.username for u in selected_user.subordinates]
+                        ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                            SalesData.tai_khoan_quan_ly.in_(subordinate_usernames)
+                        )
+                    else:
+                        ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                            SalesData.tai_khoan_quan_ly == search_user
+                        )
+            else:
+                ma_lo_query = db.session.query(SalesData.ma_lo).distinct()
+        elif user.is_manager:
+            subordinate_usernames = [u.username for u in user.subordinates]
+            if search_user and search_user in subordinate_usernames:
+                ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                    SalesData.tai_khoan_quan_ly == search_user
+                )
+            else:
+                ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
+                    SalesData.tai_khoan_quan_ly.in_(subordinate_usernames)
+                )
         else:
             ma_lo_query = db.session.query(SalesData.ma_lo).distinct().filter(
                 SalesData.tai_khoan_quan_ly == user.username
             )
+
         ma_lo_list = [item[0] for item in ma_lo_query.all()]
+
+        # Chuẩn bị danh sách users có cấu trúc phân cấp
+        if user.is_admin:
+            # Lấy tất cả managers
+            managers = User.query.filter_by(role='manager').all()
+            users_list = []
+            
+            # Thêm managers và users của họ
+            for manager in managers:
+                users_list.append({
+                    'username': manager.username,
+                    'role': 'manager',
+                    'manager_username': None
+                })
+                
+                for sub_user in manager.subordinates:
+                    users_list.append({
+                        'username': sub_user.username,
+                        'role': 'user',
+                        'manager_username': manager.username
+                    })
+            
+            # Thêm users không có manager
+            independent_users = User.query.filter(
+                User.role == 'user',
+                User.manager_id.is_(None)
+            ).all()
+            
+            for ind_user in independent_users:
+                users_list.append({
+                    'username': ind_user.username,
+                    'role': 'user',
+                    'manager_username': None
+                })
+                
+        elif user.is_manager:
+            users_list = [{
+                'username': user.username,
+                'role': 'manager',
+                'manager_username': None
+            }]
+            
+            users_list.extend([{
+                'username': sub_user.username,
+                'role': 'user',
+                'manager_username': user.username
+            } for sub_user in user.subordinates])
+        else:
+            users_list = [{
+                'username': user.username,
+                'role': 'user',
+                'manager_username': None
+            }]
 
         return jsonify({
             'success': True,
@@ -832,7 +1182,8 @@ def api_view_data():
                 'filters': {
                     'ma_lo_list': ma_lo_list,
                     'trang_thai_list': ['Đã thanh toán', 'Chưa thanh toán']
-                }
+                },
+                'users': users_list
             }
         })
 
