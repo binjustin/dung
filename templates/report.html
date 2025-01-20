@@ -1,116 +1,429 @@
 {% extends "base.html" %}
 
+{% block extra_head %}
+<!-- Thêm CSS của Choices.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+
+<style>
+    /* Custom styles cho Choices.js */
+    .choices {
+        min-width: 250px;
+    }
+
+    .choices__inner {
+        min-height: 38px;
+        padding: 4px 8px;
+        background-color: #fff;
+        border: 1px solid #ced4da;
+    }
+
+    .choices__list--dropdown {
+        z-index: 1000;
+    }
+
+    .choices__list--dropdown .choices__item--selectable {
+        padding: 6px 12px;
+    }
+
+    .choices__list--dropdown .choices__item--manager {
+        font-weight: bold;
+        color: #2c3e50;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #eee;
+        padding-top: 10px;
+    }
+
+    .choices__list--dropdown .choices__item--user {
+        padding-left: 2.5rem !important;
+    }
+
+    /* Card styles */
+    .card {
+        transition: transform 0.2s;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+    }
+
+    .rounded-circle {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- Thêm Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-
-<div class="container mt-5">
-    <h2 class="text-center">Báo cáo</h2>
-    
-    {% if is_admin %}
-    <form method="GET" action="{{ url_for('report') }}" class="mb-4">
-        <div class="mb-3">
-            <label for="user_select" class="form-label">Chọn nhân viên</label>
-            <select class="form-select" id="user_select" name="search_user">
-                <option value="">Tất cả nhân viên</option>
-                {% for user in users %}
-                    <option value="{{ user.username }}" {% if search_user == user.username %} selected {% endif %}>
-                        {{ user.username }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" class="btn btn-primary">Lọc báo cáo</button>
-    </form>
-    {% endif %}
-
+<div class="container-fluid px-4 py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Báo cáo thống kê</h2>
+        
+        {% if user.role == 'admin' or user.role == 'manager' %}
+        <form method="GET" action="{{ url_for('report') }}" class="d-flex align-items-center gap-3">
+            <div class="form-group mb-0">
+                <select id="user_select" name="search_user" placeholder="Chọn nhân viên...">
+                    {% if user.role == 'admin' %}
+                        <option value="">🔍 Tất cả nhân viên</option>
+                        {% for user_item in users %}
+                            {% if user_item.role == 'manager' %}
+                                {# Thêm option cho manager #}
+                                <option value="{{ user_item.username }}"
+                                        {% if search_user == user_item.username %} selected {% endif %}>
+                                    👥 {{ user_item.username }} (Quản lý)
+                                </option>
+                                {# Hiển thị nhân viên của manager #}
+                                {% for sub_user in users if sub_user.manager_username == user_item.username %}
+                                    <option value="{{ sub_user.username }}"
+                                            {% if search_user == sub_user.username %} selected {% endif %}>
+                                        ├─ 👤 {{ sub_user.username }}
+                                    </option>
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        {# Hiển thị cho manager #}
+                        <option value="{{ user.username }}">👥 {{ user.username }}</option>
+                        {% for user_item in users %}
+                            {% if user_item.manager_username == user.username %}
+                                <option value="{{ user_item.username }}"
+                                        {% if search_user == user_item.username %} selected {% endif %}>
+                                    ├─ 👤 {{ user_item.username }}
+                                </option>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary shadow-sm">
+                <i class="fas fa-filter me-2"></i>Lọc báo cáo
+            </button>
+        </form>
+        {% endif %}
+    </div>
     <!-- Thống kê số liệu -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Thống kê tiền thu</h5>
-                </div>
+    <div class="row g-4 mb-4">
+        <!-- Card Tổng tiền -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <p class="card-text">Tổng số tiền giao thu: <span class="fw-bold">{{ '{:,.0f}'.format(total_money) }} VNĐ</span></p>
-                    <p class="card-text">Số tiền đã thu: <span class="fw-bold text-success">{{ '{:,.0f}'.format(total_paid_money) }} VNĐ</span></p>
-                    <p class="card-text">Số tiền chưa thu: <span class="fw-bold text-danger">{{ '{:,.0f}'.format(total_unpaid_money) }} VNĐ</span></p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Tổng tiền giao thu</h6>
+                            <h4 class="mb-0">{{ '{:,.0f}'.format(total_money) }} VNĐ</h4>
+                        </div>
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3">
+                            <i class="fas fa-money-bill-wave text-primary fa-2x"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Thống kê hóa đơn</h5>
-                </div>
+
+        <!-- Card Tiền đã thu -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <p class="card-text">Tổng số hóa đơn: <span class="fw-bold">{{ total_invoices }}</span></p>
-                    <p class="card-text">Số hóa đơn đã thu: <span class="fw-bold text-success">{{ total_paid_invoices }}</span></p>
-                    <p class="card-text">Số hóa đơn chưa thu: <span class="fw-bold text-danger">{{ total_unpaid_invoices }}</span></p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Số tiền đã thu</h6>
+                            <h4 class="mb-0 text-success">{{ '{:,.0f}'.format(total_paid_money) }} VNĐ</h4>
+                        </div>
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3">
+                            <i class="fas fa-check-circle text-success fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Tiền chưa thu -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Số tiền chưa thu</h6>
+                            <h4 class="mb-0 text-danger">{{ '{:,.0f}'.format(total_unpaid_money) }} VNĐ</h4>
+                        </div>
+                        <div class="rounded-circle bg-danger bg-opacity-10 p-3">
+                            <i class="fas fa-clock text-danger fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Tỷ lệ thu tiền -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Tỷ lệ thu tiền</h6>
+                            <h4 class="mb-0 text-info">
+                                {{ '{:.1f}'.format(total_paid_money / total_money * 100 if total_money > 0 else 0) }}%
+                            </h4>
+                        </div>
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3">
+                            <i class="fas fa-percentage text-info fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thống kê hóa đơn -->
+    <div class="row g-4 mb-4">
+        <!-- Card Tổng hóa đơn -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Tổng số hóa đơn</h6>
+                            <h4 class="mb-0">{{ total_invoices }}</h4>
+                        </div>
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3">
+                            <i class="fas fa-file-invoice text-primary fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Hóa đơn đã thu -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Hóa đơn đã thu</h6>
+                            <h4 class="mb-0 text-success">{{ total_paid_invoices }}</h4>
+                        </div>
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3">
+                            <i class="fas fa-file-invoice-dollar text-success fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Hóa đơn chưa thu -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Hóa đơn chưa thu</h6>
+                            <h4 class="mb-0 text-danger">{{ total_unpaid_invoices }}</h4>
+                        </div>
+                        <div class="rounded-circle bg-danger bg-opacity-10 p-3">
+                            <i class="fas fa-file-excel text-danger fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Tỷ lệ thu hóa đơn -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Tỷ lệ thu hóa đơn</h6>
+                            <h4 class="mb-0 text-info">
+                                {{ '{:.1f}'.format(total_paid_invoices / total_invoices * 100 if total_invoices > 0 else 0) }}%
+                            </h4>
+                        </div>
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3">
+                            <i class="fas fa-chart-pie text-info fa-2x"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Biểu đồ -->
-    <div class="row">
-        <!-- Biểu đồ tròn thống kê tiền -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Biểu đồ thống kê tiền thu</h5>
+    <div class="row g-4">
+        <!-- Biểu đồ cột thống kê theo ngày -->
+        <div class="col-xl-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>
+                        Thống kê theo ngày
+                    </h5>
                 </div>
                 <div class="card-body">
-                    <canvas id="moneyChart" height="300"></canvas>
+                    <canvas id="dailyChart" height="300"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Biểu đồ tròn thống kê hóa đơn -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Biểu đồ thống kê hóa đơn</h5>
+        <!-- Biểu đồ tròn thống kê theo mã lộ -->
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2 text-primary"></i>
+                        Tỷ lệ thu tiền theo mã lộ
+                    </h5>
                 </div>
                 <div class="card-body">
-                    <canvas id="invoiceChart" height="300"></canvas>
+                    <canvas id="pieChart" height="300"></canvas>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+{% block extra_scripts %}
+<!-- Thêm Choices.js -->
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+
+<!-- Khởi tạo Choices -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userSelect = new Choices('#user_select', {
+        searchEnabled: true,
+        searchPlaceholderValue: 'Tìm kiếm nhân viên...',
+        placeholder: true,
+        placeholderValue: '🔍 Chọn nhân viên...',
+        itemSelectText: '',
+        classNames: {
+            containerOuter: 'choices shadow-sm',
+            input: 'form-control',
+            inputCloned: 'form-control-sm',
+            listDropdown: 'dropdown-menu',
+            itemChoice: 'dropdown-item'
+        },
+        callbackOnInit: function() {
+            // Tùy chỉnh style cho optgroup
+            const optgroups = document.querySelectorAll('.choices__group');
+            optgroups.forEach(group => {
+                group.classList.add('choices__item--manager');
+            });
+
+            // Tùy chỉnh style cho options
+            const options = document.querySelectorAll('.choices__item--choice');
+            options.forEach(option => {
+                if (!option.closest('.choices__group')) {
+                    option.classList.add('choices__item--user');
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}
+
+
+
+<!-- Chart.js và các plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<!-- Khởi tạo biểu đồ -->
+<!-- Chart.js và các plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<!-- Khởi tạo biểu đồ -->
 <script>
     Chart.register(ChartDataLabels);
 
-    // Truyền dữ liệu từ Flask vào JavaScript dưới dạng JSON
-    const totalMoney = JSON.parse('{{ total_money | tojson | safe }}');
-    const totalPaidMoney = JSON.parse('{{ total_paid_money | tojson | safe }}');
-    const totalUnpaidMoney = JSON.parse('{{ total_unpaid_money | tojson | safe }}');
+    // Parse dữ liệu JSON một cách an toàn
+    const chartData = JSON.parse('{{ chart_data | tojson | safe }}');
+    const pieChartData = JSON.parse('{{ pie_chart_data | tojson | safe }}');
 
-    const totalInvoices = JSON.parse('{{ total_invoices | tojson | safe }}');
-    const totalPaidInvoices = JSON.parse('{{ total_paid_invoices | tojson | safe }}');
-    const totalUnpaidInvoices = JSON.parse('{{ total_unpaid_invoices | tojson | safe }}');
+    document.addEventListener('DOMContentLoaded', function() {
+        // Biểu đồ cột theo ngày
+        const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+        new Chart(dailyCtx, {
+            type: 'bar',
+            data: {
+                labels: chartData.dates,
+                datasets: [{
+                    label: 'Số tiền đã thu (VNĐ)',
+                    data: chartData.amounts,
+                    backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                    borderColor: 'rgb(40, 167, 69)',
+                    borderWidth: 2,
+                    borderRadius: 5,
+                    barThickness: 20
+                }, {
+                    label: 'Số hóa đơn',
+                    data: chartData.counts,
+                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                    borderColor: 'rgb(0, 123, 255)',
+                    borderWidth: 2,
+                    borderRadius: 5,
+                    barThickness: 20,
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            drawBorder: false
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + ' VNĐ';
+                            }
+                        }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: {
+                            display: false
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    datalabels: {
+                        display: false
+                    }
+                }
+            }
+        });
 
-    // Cấu hình chung cho biểu đồ
-    function createConfig(data, labels) {
-        return {
+        // Biểu đồ tròn theo mã lộ
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        new Chart(pieCtx, {
             type: 'doughnut',
             data: {
-                labels: labels,
+                labels: pieChartData.labels,
                 datasets: [{
-                    data: data,
+                    data: pieChartData.paid_percentages,
                     backgroundColor: [
                         'rgba(40, 167, 69, 0.8)',
-                        'rgba(220, 53, 69, 0.8)'
+                        'rgba(0, 123, 255, 0.8)',
+                        'rgba(255, 193, 7, 0.8)',
+                        'rgba(220, 53, 69, 0.8)',
+                        'rgba(111, 66, 193, 0.8)'
                     ],
-                    borderColor: [
-                        'rgb(40, 167, 69)',
-                        'rgb(220, 53, 69)'
-                    ],
-                    borderWidth: 1
+                    borderWidth: 2,
+                    borderColor: '#fff'
                 }]
             },
             options: {
@@ -122,49 +435,51 @@
                         position: 'bottom',
                         labels: {
                             padding: 20,
-                            font: {
-                                size: 12
-                            }
+                            usePointStyle: true
                         }
                     },
                     datalabels: {
-                        color: '#000',
-                        anchor: 'center',
-                        align: 'center',
+                        color: '#fff',
                         font: {
-                            size: 14,
                             weight: 'bold'
                         },
-                        formatter: function(value, context) {
-                            const dataset = context.chart.data.datasets[0];
-                            const total = dataset.data.reduce((acc, data) => acc + parseFloat(data), 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return percentage + '%';
+                        formatter: function(value) {
+                            return value + '%';
                         }
                     }
-                },
-                layout: {
-                    padding: 20
                 }
             }
-        };
-    }
-
-    // Khởi tạo biểu đồ khi trang đã load
-    document.addEventListener('DOMContentLoaded', function() {
-        // Biểu đồ tiền
-        const moneyCtx = document.getElementById('moneyChart').getContext('2d');
-        new Chart(moneyCtx, createConfig(
-            [totalPaidMoney, totalUnpaidMoney],
-            ['Đã thu', 'Chưa thu']
-        ));
-
-        // Biểu đồ hóa đơn
-        const invoiceCtx = document.getElementById('invoiceChart').getContext('2d');
-        new Chart(invoiceCtx, createConfig(
-            [totalPaidInvoices, totalUnpaidInvoices],
-            ['Đã thu', 'Chưa thu']
-        ));
+        });
     });
+</script>
+
+<!-- Select2 initialization -->
+<script>
+$(document).ready(function() {
+    $('.form-select-tree').select2({
+        templateResult: formatUser,
+        templateSelection: formatUserSelection,
+        escapeMarkup: function(m) { return m; }
+    });
+});
+
+function formatUser(user) {
+    if (!user.id) return user.text;
+    
+    var $user = $(user.element);
+    var role = $user.data('role');
+    var manager = $user.data('manager');
+    
+    if (role === 'manager') {
+        return $('<div class="select2-results__option--manager">' + user.text + '</div>');
+    } else {
+        return $('<div class="select2-results__option--user">' + user.text + '</div>');
+    }
+}
+
+function formatUserSelection(user) {
+    if (!user.id) return user.text;
+    return user.text;
+}
 </script>
 {% endblock %}

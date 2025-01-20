@@ -1,24 +1,170 @@
-<!-- templates/admin/import.html -->
 {% extends 'base.html' %}
 
+{% block extra_head %}
+<style>
+    .upload-container {
+        max-width: 600px;
+        margin: 2rem auto;
+    }
+
+    .upload-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        padding: 2rem;
+    }
+
+    .file-upload {
+        position: relative;
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .file-upload:hover {
+        border-color: #0d6efd;
+        background: #e9ecef;
+    }
+
+    .file-upload input[type="file"] {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .file-upload-icon {
+        font-size: 2rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+
+    .file-name {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .select-user {
+        margin-top: 1.5rem;
+    }
+
+    .btn-import {
+        width: 100%;
+        padding: 0.8rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-import:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(13, 110, 253, 0.2);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<h2>Import Data</h2>
-<form method="POST" enctype="multipart/form-data">
-    <div class="form-group">
-        <label for="file">Choose Excel File:</label>
-        <input type="file" class="form-control" id="file" name="file" required>
+<div class="container upload-container">
+    <div class="upload-card">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-primary">
+                <i class="fas fa-file-import me-2"></i>Import Data
+            </h2>
+            <p class="text-muted">Upload your Excel file and assign it to a user</p>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data">
+            <!-- File Upload -->
+            <div class="mb-4">
+                <label class="form-label fw-medium">Excel File</label>
+                <div class="file-upload" id="dropZone">
+                    <input type="file" class="form-control" id="file" name="file" 
+                           accept=".xlsx,.xls" required>
+                    <div class="file-upload-icon">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="file-upload-text">
+                        <strong>Choose a file</strong> or drag it here
+                    </div>
+                    <div class="file-name" id="fileName"></div>
+                </div>
+            </div>
+            
+            <!-- User Selection -->
+            <div class="select-user">
+                <label class="form-label fw-medium">
+                    <i class="fas fa-user me-2"></i>Assign to User
+                </label>
+                <select class="form-select" id="selected_user" name="selected_user" required>
+                    <option value="">Select a user to assign...</option>
+                    {% for user in users %}
+                    <option value="{{ user.username }}">
+                        {% if user.role == 'manager' %}
+                            👥 {{ user.username }} (Manager)
+                        {% else %}
+                            👤 {{ user.username }}
+                        {% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary btn-import">
+                <i class="fas fa-upload me-2"></i>Import Data
+            </button>
+        </form>
     </div>
-    
-    <div class="form-group">
-        <label for="selected_user">Assign to User:</label>
-        <select class="form-control" id="selected_user" name="selected_user" required>
-            <option value="">Select User</option>
-            {% for user in users %}
-            <option value="{{ user.username }}">{{ user.username }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    
-    <button type="submit" class="btn btn-primary mt-3">Import Data</button>
-</form>
+</div>
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('file');
+    const fileName = document.getElementById('fileName');
+
+    // Xử lý hiển thị tên file
+    fileInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            fileName.textContent = this.files[0].name;
+            dropZone.style.borderColor = '#0d6efd';
+        }
+    });
+
+    // Xử lý drag & drop
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.style.borderColor = '#0d6efd';
+        dropZone.style.background = '#e9ecef';
+    });
+
+    dropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        dropZone.style.borderColor = '#dee2e6';
+        dropZone.style.background = '#f8f9fa';
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        fileInput.files = e.dataTransfer.files;
+        if (fileInput.files && fileInput.files[0]) {
+            fileName.textContent = fileInput.files[0].name;
+        }
+        dropZone.style.borderColor = '#0d6efd';
+        dropZone.style.background = '#f8f9fa';
+    });
+});
+</script>
+{% endblock %}
 {% endblock %}

@@ -3,7 +3,7 @@
 {% block title %}View Data{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-1">
+<div class="container-fluid">
     <div class="card shadow mb-4">
         <div class="card-body">
             <!-- Form tìm kiếm -->
@@ -72,7 +72,8 @@
                         <div class="form-group">
                             <label class="form-label fw-bold">Ngày Thu</label>
                             <input type="date" name="search_ngay_thu" class="form-control form-control-sm" 
-                                   value="{{ search_ngay_thu or '' }}">
+                                   value="{{ search_ngay_thu or '' }}"
+                                   onchange="this.form.submit()">
                         </div>
                     </div>
 
@@ -105,9 +106,9 @@
                     <thead class="table-light">
                         <tr class="text-center">
                             <th width="30px"><input type="checkbox" id="selectAll"></th>
-                            <th width="50px">STT</th>
-                            <th>Mã Lộ</th>
-                            <th>TT HĐ</th>
+                            <th width="20px">STT</th>
+                            <th width="20px">Mã Lộ</th>
+                            <th width="20px">TT HĐ</th>
                             <th>Mã KH</th>
                             <th>Tên Khách Hàng</th>
                             <th>Địa Chỉ</th>
@@ -115,7 +116,7 @@
                             <th>Tiền Điện</th>
                             <th>VAT</th>
                             <th>Tổng Tiền</th>
-                            <th>Tài Khoản QL</th>
+                            <th>Tài Khoản Quản Lý</th>
                             <th>Trạng Thái</th>
                             <th>Ngày Thu</th>
                             <th width="200px">Hành Động</th>
@@ -349,7 +350,7 @@ function markAsPaid(id) {
 }
 
 .card-body {
-    padding: 1.25rem;
+    padding: 1rem;
     
 }
 
@@ -456,7 +457,7 @@ function markAsPaid(id) {
 /* Button Styles */
 .btn-sm {
     padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;

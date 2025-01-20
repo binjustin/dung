@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Welcome Section -->
+    <div class="welcome-section mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="welcome-title">
+                    <i class="fas fa-smile text-primary me-2"></i>
+                    Xin chào, {{ user.username }}
+                </h1>
+                <p class="text-muted mb-0">
+                    <i class="fas fa-calendar-alt me-2"></i>
+                    {{ datetime.now().strftime('%d %B %Y') }}
+                </p>
+            </div>
+            <div class="current-time">
+                <i class="fas fa-clock text-primary"></i>
+                <span id="current-time">{{ datetime.now().strftime('%H:%M') }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Tổng doanh thu -->
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="stat-card-body">
+                    <div class="stat-card-info">
+                        <div class="stat-card-title">Tổng doanh thu</div>
+                        <div class="stat-card-value">{{ "{:,.0f}".format(total_revenue) }} VNĐ</div>
+                        <div class="stat-card-subtitle">
+                            <span class="text-success">
+                                <i class="fas fa-file-invoice me-1"></i>
+                                {{ total_invoices }} hóa đơn
+                            </span>
+                        </div>
+                    </div>
+                    <div class="stat-card-icon bg-primary-subtle">
+                        <i class="fas fa-coins text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Đã thanh toán -->
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="stat-card-body">
+                    <div class="stat-card-info">
+                        <div class="stat-card-title">Đã thanh toán</div>
+                        <div class="stat-card-value">{{ "{:,.0f}".format(total_paid) }} VNĐ</div>
+                        <div class="stat-card-subtitle">
+                            <span class="text-success">
+                                <i class="fas fa-check-circle me-1"></i>
+                                {{ total_paid_invoices }} hóa đơn
+                            </span>
+                        </div>
+                    </div>
+                    <div class="stat-card-icon bg-success-subtle">
+                        <i class="fas fa-check text-success"></i>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Chưa thanh toán -->
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="stat-card-body">
+                    <div class="stat-card-info">
+                        <div class="stat-card-title">Chưa thanh toán</div>
+                        <div class="stat-card-value">{{ "{:,.0f}".format(total_unpaid) }} VNĐ</div>
+                        <div class="stat-card-subtitle">
+                            <span class="text-warning">
+                                <i class="fas fa-clock me-1"></i>
+                                {{ total_unpaid_invoices }} hóa đơn
+                            </span>
+                        </div>
+                    </div>
+                    <div class="stat-card-icon bg-warning-subtle">
+                        <i class="fas fa-exclamation-circle text-warning"></i>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+
+        <!-- Tỷ lệ hoàn thành -->
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="stat-card-body">
+                    <div class="stat-card-info">
+                        <div class="stat-card-title">Tỷ lệ hoàn thành</div>
+                        <div class="stat-card-value">{{ "{:.1f}".format(completion_rate) }}%</div>
+                        <div class="stat-card-subtitle">
+                            <span class="text-info">
+                                <i class="fas fa-chart-line me-1"></i>
+                                Tiến độ thu tiền
+                            </span>
+                        </div>
+                    </div>
+                    <div class="stat-card-icon bg-info-subtle">
+                        <i class="fas fa-percentage text-info"></i>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-4">
+        <!-- Line Chart -->
+        <div class="col-xl-8">
+            <div class="content-card">
+                <div class="content-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line text-primary me-2"></i>
+                        Thống kê 7 ngày gần đây
+                    </h5>
+                </div>
+                <div class="content-card-body">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pie Chart -->
+        <div class="col-xl-4">
+            <div class="content-card">
+                <div class="content-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie text-primary me-2"></i>
+                        Tỷ lệ thu tiền theo mã lộ
+                    </h5>
+                </div>
+                <div class="content-card-body">
+                    <canvas id="routePieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row g-4">
+        <!-- Recent Transactions -->
+        <div class="col-xl">
+            <div class="content-card">
+                <div class="content-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history text-primary me-2"></i>
+                        Giao dịch gần đây
+                    </h5>
+                    <a href="{{ url_for('view_data') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-list me-1"></i>
+                        Xem tất cả
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Mã KH</th>
+                                <th>Tên khách hàng</th>
+                                <th class="text-end">Số tiền</th>
+                                <th class="text-center">Trạng thái</th>
+                                <th class="text-end">Thời gian</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trans in recent_transactions %}
+                            <tr>
+                                <td>{{ trans.ma_khach_hang }}</td>
+                                <td>{{ trans.ten_khach_hang }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(trans.tong_tien) }} VNĐ</td>
+                                <td class="text-center">
+                                    <span class="badge {{ 'bg-success' if trans.trang_thai == 'Đã thanh toán' else 'bg-warning' }}">
+                                        {{ trans.trang_thai }}
+                                    </span>
+                                </td>
+                                <td class="text-end">{{ trans.ngay_thu.strftime('%H:%M') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Routes -->
+        
+    </div>
+</div>
+
+<!-- Add Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Line Chart
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const lineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: JSON.parse('{{ chart_data.dates | tojson | safe }}'),
+            datasets: [
+                {
+                    label: 'Doanh thu đã thu',
+                    data: JSON.parse('{{ chart_data.amounts | tojson | safe }}'),
+                    borderColor: '#4e73df',
+                    tension: 0.1,
+                    fill: false,
+                },
+                {
+                    label: 'Số lượng hóa đơn',
+                    data: JSON.parse('{{ chart_data.counts | tojson | safe }}'),
+                    borderColor: '#1cc88a',
+                    tension: 0.1,
+                    fill: false,
+                    yAxisID: 'y1',
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Doanh thu (VNĐ)',
+                    },
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Số lượng hóa đơn',
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                },
+            },
+        },
+    });
+    
+    // Pie Chart
+    const pieCtx = document.getElementById('routePieChart').getContext('2d');
+    const pieChart = new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+            labels: JSON.parse('{{ pie_chart_data.labels | tojson | safe }}'),
+            datasets: [
+                {
+                    data: JSON.parse('{{ pie_chart_data.paid_percentages | tojson | safe }}'),
+                    backgroundColor: [
+                        '#4e73df',
+                        '#1cc88a',
+                        '#36b9cc',
+                        '#f6c23e',
+                        '#e74a3b',
+                        '#858796',
+                        '#5a5c69',
+                        '#2c9faf',
+                        '#3498db',
+                        '#e67e22',
+                    ],
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.raw}%`;
+                        },
+                    },
+                },
+            },
+        },
+    });
+    
+    // Update current time
+    function updateTime() {
+        const timeElement = document.getElementById('current-time');
+        const now = new Date();
+        timeElement.textContent = now.toLocaleTimeString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }
+    
+    setInterval(updateTime, 1000);
+    </script>
+
+
+<style>
+/* Welcome Section */
+.welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.current-time {
+    background: #f8f9fa;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+/* Stat Cards */
+.stat-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card-body {
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.stat-card-info {
+    flex: 1;
+}
+
+.stat-card-title {
+    color: #858796;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card-value {
+    color: #2c3e50;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card-subtitle {
+    font-size: 0.875rem;
+}
+
+.stat-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-card-icon i {
+    font-size: 1.5rem;
+}
+
+.stat-card-progress {
+    padding: 0 1.25rem 1.25rem;
+}
+
+.progress {
+    height: 4px;
+    background-color: #eaecf4;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+/* Content Cards */
+.content-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+    height: 100%;
+}
+
+.content-card-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid #e3e6f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.content-card-body {
+    padding: 1.25rem;
+    min-height: 300px;
+}
+
+/* Table Styles */
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #4e73df;
+    font-size: 0.85rem;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+/* Route Items */
+.route-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #e3e6f0;
+}
+
+.route-item:last-child {
+    border-bottom: none;
+}
+
+.route-name {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.25rem;
+}
+
+.route-stats {
+    font-size: 0.875rem;
+}
+
+.route-amount {
+    font-weight: 600;
+    color: #4e73df;
+}
+
+/* Chart container */
+.chart-container {
+    position: relative;
+    margin: auto;
+    height: 300px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .welcome-title {
+        font-size: 1.25rem;
+    }
+
+    .stat-card-value {
+        font-size: 1.25rem;
+    }
+
+    .current-time {
+        font-size: 1rem;
+    }
+}
+
+</style>
+{% endblock %}

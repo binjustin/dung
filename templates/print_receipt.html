@@ -2,81 +2,373 @@
 
 {% block title %}In Biên Lai{% endblock %}
 
-{% block content %}
-<div class="container mt-4">
-    <div class="card">
-        <div class="card-header">
-            <h3>Biên Lai Thu Tiền</h3>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Mã Khách Hàng:</strong> {{ data.ma_khach_hang }}</p>
-                    <p><strong>Tên Khách Hàng:</strong> {{ data.ten_khach_hang }}</p>
-                    <p><strong>Địa Chỉ:</strong> {{ data.dia_chi }}</p>
-                </div>
-                <div class="col-md-6">
-                    <p><strong>Mã Lộ:</strong> {{ data.ma_lo }}</p>
-                    <p><strong>Số Kwh:</strong> {{ data.kwh }}</p>
-                </div>
-            </div>
-            <hr>
-            <div class="row mt-3">
-                <div class="col-md-12">
-                    <table class="table">
-                        <tr>
-                            <td><strong>Tiền Điện:</strong></td>
-                            <td class="text-right">{{ "{:,.0f}".format(data.tien_dien) }} VNĐ</td>
-                        </tr>
-                        <tr>
-                            <td><strong>VAT:</strong></td>
-                            <td class="text-right">{{ "{:,.0f}".format(data.vat) }} VNĐ</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Tổng Tiền:</strong></td>
-                            <td class="text-right"><strong>{{ "{:,.0f}".format(data.tong_tien) }} VNĐ</strong></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Ngày thu:</strong></td>
-                            <td class="text-right">{% if data.ngay_thu %}
-                                {{ data.ngay_thu.strftime('%d/%m/%Y %H:%M') }}
-                            {% else %}
-                                Chưa gạch nợ
-                            {% endif %}</td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <div class="card-footer text-center">
-            <button onclick="window.print()" class="btn btn-primary">In Biên Lai</button>
-            <button onclick="window.close()" class="btn btn-secondary">Đóng</button>
-        </div>
-    </div>
-</div>
-
-<!-- CSS cho chế độ in ấn -->
+{% block extra_head %}
 <style>
+    body {
+        background: #f0f2f5;
+    }
+
+    .receipt-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .receipt-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        border: none;
+        overflow: hidden;
+    }
+
+    .receipt-header {
+        background: linear-gradient(135deg, #0d6efd, #0099ff);
+        padding: 2rem;
+        color: white;
+        position: relative;
+    }
+
+    .receipt-header::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 0;
+        right: 0;
+        height: 20px;
+        background: white;
+        clip-path: polygon(0 0, 100% 0, 50% 100%);
+    }
+
+    .receipt-title {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.8rem;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+    }
+
+    .receipt-title i {
+        font-size: 2rem;
+    }
+
+    .receipt-body {
+        padding: 2.5rem;
+    }
+
+    .customer-info {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .info-item {
+        display: flex;
+        align-items: baseline;
+        margin-bottom: 1rem;
+        padding: 0.8rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .info-item:hover {
+        background: rgba(13, 110, 253, 0.05);
+    }
+
+    .info-label {
+        min-width: 150px;
+        color: #6c757d;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .info-label i {
+        color: #0d6efd;
+        font-size: 1.1rem;
+    }
+
+    .info-value {
+        color: #2c3e50;
+        font-weight: 500;
+    }
+
+    .receipt-table {
+        width: 100%;
+        margin-top: 2rem;
+        border-collapse: separate;
+        border-spacing: 0 0.8rem;
+    }
+
+    .receipt-table tr {
+        background: #f8f9fa;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .receipt-table tr:hover {
+        background: #e9ecef;
+        transform: translateX(5px);
+    }
+
+    .receipt-table td {
+        padding: 1.2rem;
+        border: none;
+        font-size: 1.1rem;
+    }
+
+    .receipt-table td:first-child {
+        border-radius: 12px 0 0 12px;
+        font-weight: 500;
+    }
+
+    .receipt-table td:last-child {
+        border-radius: 0 12px 12px 0;
+    }
+
+    .receipt-table .amount {
+        text-align: right;
+        font-family: 'JetBrains Mono', 'Courier New', monospace;
+        font-weight: 600;
+        color: #0d6efd;
+    }
+
+    .total-row {
+        background: linear-gradient(135deg, #0d6efd, #0099ff) !important;
+        color: white !important;
+    }
+
+    .total-row:hover {
+        transform: none !important;
+    }
+
+    .total-row .amount {
+        color: white !important;
+    }
+
+    .receipt-footer {
+        padding: 2rem;
+        background: #f8f9fa;
+        border-top: 2px dashed #dee2e6;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .btn {
+        padding: 0.8rem 2.5rem;
+        font-weight: 600;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        min-width: 180px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .btn i {
+        font-size: 1.1rem;
+    }
+
+    .btn-print {
+        background: linear-gradient(135deg, #0d6efd, #0099ff);
+        border: none;
+        color: white;
+        box-shadow: 0 4px 15px rgba(13, 110, 253, 0.2);
+    }
+
+    .btn-print:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(13, 110, 253, 0.3);
+        background: linear-gradient(135deg, #0099ff, #0d6efd);
+    }
+
+    .btn-close {
+        background: #6c757d;
+        border: none;
+        color: white;
+        box-shadow: 0 4px 15px rgba(108, 117, 125, 0.2);
+    }
+
+    .btn-close:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(108, 117, 125, 0.3);
+    }
+
+    @media (max-width: 576px) {
+        .receipt-footer {
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+
+        .btn {
+            width: 100%;
+            min-width: auto;
+        }
+    }
+
     @media print {
-        /* Ẩn các phần không cần thiết khi in */
+        /* Ẩn tất cả các phần tử trên trang */
         body * {
             visibility: hidden;
         }
         
-        .container, .container * {
+        /* Chỉ hiển thị phần biên lai */
+        .receipt-card,
+        .receipt-card * {
             visibility: visible;
         }
         
-        .container {
+        /* Đặt lại vị trí của biên lai */
+        .receipt-card {
             position: absolute;
             left: 0;
             top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
         }
-        
-        /* Ẩn footer khi in */
-        .card-footer {
+
+        /* Ẩn các nút không cần thiết khi in */
+        .receipt-footer,
+        .btn-print,
+        .btn-close,
+        .navbar,
+        .sidebar {
+            display: none !important;
+        }
+
+        /* Đảm bảo background và màu sắc phù hợp cho in ấn */
+        .receipt-header {
+            background: none !important;
+            color: #000 !important;
+            border-bottom: 2px solid #000;
+        }
+
+        .receipt-header::after {
             display: none;
+        }
+
+        .total-row {
+            background: none !important;
+            border-top: 2px solid #000 !important;
+            border-bottom: 2px solid #000 !important;
+        }
+
+        .total-row * {
+            color: #000 !important;
+        }
+
+        /* Tối ưu hóa kích thước giấy */
+        @page {
+            size: auto;
+            margin: 10mm;
         }
     }
 </style>
+<script>
+    function printReceipt() {
+        // Lưu trữ title gốc
+        const originalTitle = document.title;
+        
+        // Đổi title khi in
+        document.title = "Biên Lai Thu Tiền - {{ data.ma_khach_hang }}";
+        
+        window.print();
+        
+        // Khôi phục title gốc
+        document.title = originalTitle;
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="receipt-container">
+    <div class="receipt-card">
+        <div class="receipt-header">
+            <h3 class="receipt-title">
+                <i class="fas fa-receipt me-2"></i>
+                Biên Lai Thu Tiền
+            </h3>
+        </div>
+        
+        <div class="receipt-body">
+            <div class="customer-info">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-id-card me-2"></i>Mã KH:</span>
+                            <span class="info-value">{{ data.ma_khach_hang }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-user me-2"></i>Tên KH:</span>
+                            <span class="info-value">{{ data.ten_khach_hang }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-map-marker-alt me-2"></i>Địa Chỉ:</span>
+                            <span class="info-value">{{ data.dia_chi }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-route me-2"></i>Mã Lộ:</span>
+                            <span class="info-value">{{ data.ma_lo }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-bolt me-2"></i>Số Kwh:</span>
+                            <span class="info-value">{{ data.kwh }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <table class="receipt-table">
+                <tr>
+                    <td><i class="fas fa-money-bill me-2"></i>Tiền Điện:</td>
+                    <td class="amount">{{ "{:,.0f}".format(data.tien_dien) }} VNĐ</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-percentage me-2"></i>VAT:</td>
+                    <td class="amount">{{ "{:,.0f}".format(data.vat) }} VNĐ</td>
+                </tr>
+                <tr class="total-row">
+                    <td><i class="fas fa-coins me-2"></i>Tổng Tiền:</td>
+                    <td class="amount">{{ "{:,.0f}".format(data.tong_tien) }} VNĐ</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-calendar-alt me-2"></i>Ngày thu:</td>
+                    <td class="amount">
+                        {% if data.ngay_thu %}
+                            {{ data.ngay_thu.strftime('%d/%m/%Y %H:%M') }}
+                        {% else %}
+                            Chưa gạch nợ
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+                <!-- Sửa lại button in -->
+        <div class="receipt-footer">
+            <button onclick="printReceipt()" class="btn btn-print">
+                <i class="fas fa-print"></i>
+                In Biên Lai
+            </button>
+            <button onclick="window.close()" class="btn btn-close">
+                <i class="fas fa-times"></i>
+                Đóng
+            </button>
+        </div>
+    </div>
+</div>
 {% endblock %}
