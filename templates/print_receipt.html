@@ -318,6 +318,12 @@
                             <span class="info-label"><i class="fas fa-map-marker-alt me-2"></i>Địa Chỉ:</span>
                             <span class="info-value">{{ data.dia_chi }}</span>
                         </div>
+                        {% if data.so_dien_thoai is defined and data.so_dien_thoai %}
+                        <div class="info-item">
+                            <span class="info-label"><i class="fas fa-phone me-2"></i>Số ĐT:</span>
+                            <span class="info-value">{{ data.so_dien_thoai }}</span>
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6">
                         <div class="info-item">

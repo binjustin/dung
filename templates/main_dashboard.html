@@ -183,7 +183,7 @@
                                         {{ trans.trang_thai }}
                                     </span>
                                 </td>
-                                <td class="text-end">{{ trans.ngay_thu.strftime('%H:%M') }}</td>
+                                <td class="text-end">{{ trans.ngay_thu.strftime('%H:%M') if trans.ngay_thu else 'Chưa gạch nợ' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

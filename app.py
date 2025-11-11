@@ -47,6 +47,7 @@ class SalesData(db.Model):
     ma_khach_hang = db.Column(db.String(50))
     ten_khach_hang = db.Column(db.String(100), index=True)
     dia_chi = db.Column(db.String(200))
+    so_dien_thoai = db.Column(db.String(20))  # Thêm cột số điện thoại
     kwh = db.Column(db.String(50))
     tien_dien = db.Column(db.Float)
     vat = db.Column(db.Float)
@@ -455,6 +456,11 @@ def import_data():
                         flash(f'Lỗi dữ liệu số tại dòng {index + 2}')
                         continue
                     
+                    # Lấy số điện thoại nếu cột tồn tại
+                    so_dien_thoai = ''
+                    if 'Số điện thoại' in df.columns and pd.notna(row['Số điện thoại']):
+                        so_dien_thoai = str(row['Số điện thoại'])
+                    
                     # Tạo bản ghi mới
                     data = SalesData(
                         stt=row['STT'],
@@ -463,6 +469,7 @@ def import_data():
                         ma_khach_hang=str(row['Mã Khách hàng']),
                         ten_khach_hang=str(row['Tên Khách hàng']),
                         dia_chi=str(row['Địa chỉ']),
+                        so_dien_thoai=so_dien_thoai,
                         kwh=str(row['Kwh']),
                         tien_dien=tien_dien,
                         vat=vat,
@@ -515,15 +522,27 @@ def export_data():
     search_ten_khach_hang = request.args.get('search_ten_khach_hang', '', type=str).strip()
     search_ngay_thu = request.args.get('search_ngay_thu', '', type=str)
 
-    # Tạo truy vấn cơ sở dữ liệu dựa trên quyền người dùng
-    if user.is_admin:
-        query = SalesData.query
-    else:
-        query = SalesData.query.filter_by(tai_khoan_quan_ly=user.username)
+    # Xây dựng query cơ bản
+    query = SalesData.query
 
-    # Áp dụng bộ lọc tìm kiếm
+    # Xử lý tìm kiếm theo tài khoản quản lý
     if search_user:
-        query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
+        if User.query.filter_by(username=search_user, role='manager').first():
+            # Nếu tìm theo manager, chỉ lấy dữ liệu của users dưới quyền
+            manager = User.query.filter_by(username=search_user).first()
+            subordinate_usernames = [u.username for u in manager.subordinates]
+            query = query.filter(SalesData.tai_khoan_quan_ly.in_(subordinate_usernames))
+        else:
+            # Nếu tìm theo user thường
+            query = query.filter(SalesData.tai_khoan_quan_ly == search_user)
+    elif not user.is_admin:  # Nếu không có tìm kiếm và không phải admin
+        if user.is_manager:
+            # Manager sẽ thấy dữ liệu của các user dưới quyền
+            subordinate_usernames = [u.username for u in user.subordinates]
+            query = query.filter(SalesData.tai_khoan_quan_ly.in_(subordinate_usernames))
+        else:
+            # User thường chỉ thấy dữ liệu của mình
+            query = query.filter(SalesData.tai_khoan_quan_ly == user.username)
     
     if search_ma_lo:
         query = query.filter(SalesData.ma_lo.like(f'%{search_ma_lo}%'))
@@ -546,6 +565,11 @@ def export_data():
 
     # Truy vấn dữ liệu sau khi áp dụng bộ lọc
     data = query.all()
+    
+    # Debug: In số lượng dữ liệu
+    print(f"Export debug - User: {user.username}, Role: {user.role}")
+    print(f"Export debug - Found {len(data)} records")
+    print(f"Export debug - Search params: user={search_user}, ma_lo={search_ma_lo}, trang_thai={search_trang_thai}")
 
     # Tạo file Excel
     wb = openpyxl.Workbook()
@@ -553,11 +577,12 @@ def export_data():
     ws.title = "Filtered Sales Data"
 
     # Tiêu đề cột
-    ws.append(['STT', 'Mã Lộ', 'Mã Khách Hàng', 'Tên Khách Hàng', 'Địa Chỉ', 'Tổng Tiền', 'Tài Khoản Quản Lý', 'Trạng Thái', 'Ngày thu'])
+    ws.append(['STT', 'Mã Lộ', 'Mã Khách Hàng', 'Tên Khách Hàng', 'Địa Chỉ', 'Số Điện Thoại', 'Tổng Tiền', 'Tài Khoản Quản Lý', 'Trạng Thái', 'Ngày thu'])
 
     # Ghi dữ liệu vào file Excel
     for row in data:
-        ws.append([row.stt, row.ma_lo, row.ma_khach_hang, row.ten_khach_hang, row.dia_chi, row.tong_tien, row.tai_khoan_quan_ly, row.trang_thai, row.ngay_thu])
+        so_dien_thoai = getattr(row, 'so_dien_thoai', '')  # Lấy số điện thoại nếu có, nếu không thì để trống
+        ws.append([row.stt, row.ma_lo, row.ma_khach_hang, row.ten_khach_hang, row.dia_chi, so_dien_thoai, row.tong_tien, row.tai_khoan_quan_ly, row.trang_thai, row.ngay_thu])
 
     # Lưu file Excel vào bộ nhớ tạm
     output = BytesIO()
@@ -1214,6 +1239,7 @@ def api_view_data():
             'ma_khach_hang': item.ma_khach_hang,
             'ten_khach_hang': item.ten_khach_hang,
             'dia_chi': item.dia_chi,
+            'so_dien_thoai': getattr(item, 'so_dien_thoai', ''),
             'kwh': item.kwh,
             'tien_dien': item.tien_dien,
             'vat': item.vat,

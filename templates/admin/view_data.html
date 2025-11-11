@@ -112,6 +112,7 @@
                             <th>Mã KH</th>
                             <th>Tên Khách Hàng</th>
                             <th>Địa Chỉ</th>
+                            <th>Số Điện Thoại</th>
                             <th>Kwh</th>
                             <th>Tiền Điện</th>
                             <th>VAT</th>
@@ -132,6 +133,7 @@
                             <td class="text-center">{{ row.ma_khach_hang }}</td>
                             <td>{{ row.ten_khach_hang }}</td>
                             <td>{{ row.dia_chi }}</td>
+                            <td class="text-center">{{ row.so_dien_thoai if row.so_dien_thoai is defined else '' }}</td>
                             <td class="text-end">{{ row.kwh }}</td>
                             <td class="text-end">{{ "{:,.0f}".format(row.tien_dien) }}</td>
                             <td class="text-end">{{ "{:,.0f}".format(row.vat) }}</td>
@@ -167,12 +169,12 @@
                         {% endfor %}
                         <!-- Dòng tổng -->
                         <tr class="table-secondary fw-bold fs-1">
-                            <td colspan="10" class="text-end">Tổng số tiền:</td>
+                            <td colspan="11" class="text-end">Tổng số tiền:</td>
                             <td class="text-end">{{ "{:,.0f}".format(total_amount) }}</td>
                             <td colspan="4"></td>
                         </tr>
                         <tr class="table-secondary fw-bold fs-5">
-                            <td colspan="10" class="text-end">Tổng số hóa đơn:</td>
+                            <td colspan="11" class="text-end">Tổng số hóa đơn:</td>
                             <td class="text-end">{{ total_invoices }}</td>
                             <td colspan="4"></td>
                         </tr>
