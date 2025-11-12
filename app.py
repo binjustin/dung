@@ -1,24 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-import pandas as pd
 from werkzeug.utils import secure_filename
-import os
-from datetime import datetime
+from functools import wraps
 from datetime import datetime, timedelta
-from io import BytesIO
-from flask import Response
-import openpyxl
-from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import case, func, distinct, extract
+from io import BytesIO
+from sqlalchemy import case, func, distinct, extract, and_, event, or_
 from unidecode import unidecode
-from sqlalchemy import and_, func
-from sqlalchemy import event
-from sqlalchemy import or_
-import requests
+import pandas as pd
+import openpyxl
+import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
