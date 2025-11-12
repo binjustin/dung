@@ -53,6 +53,51 @@
         align-items: center;
         justify-content: center;
     }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding: 0.5rem !important;
+        }
+        
+        .card-body {
+            padding: 1rem;
+        }
+        
+        .col-xl-3, .col-md-6 {
+            margin-bottom: 1rem;
+        }
+        
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .form-group {
+            width: 100%;
+        }
+        
+        .choices {
+            min-width: 100%;
+        }
+        
+        h4 {
+            font-size: 1.2rem;
+        }
+        
+        h6 {
+            font-size: 0.9rem;
+        }
+        
+        .rounded-circle {
+            width: 40px;
+            height: 40px;
+        }
+        
+        .fa-2x {
+            font-size: 1.5em !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -282,10 +327,15 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-{% block extra_scripts %}
+{% block script %}
 <!-- Thêm Choices.js -->
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+
+<!-- Chart.js và các plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 
 <!-- Khởi tạo Choices -->
 <script>
@@ -302,37 +352,10 @@ document.addEventListener('DOMContentLoaded', function() {
             inputCloned: 'form-control-sm',
             listDropdown: 'dropdown-menu',
             itemChoice: 'dropdown-item'
-        },
-        callbackOnInit: function() {
-            // Tùy chỉnh style cho optgroup
-            const optgroups = document.querySelectorAll('.choices__group');
-            optgroups.forEach(group => {
-                group.classList.add('choices__item--manager');
-            });
-
-            // Tùy chỉnh style cho options
-            const options = document.querySelectorAll('.choices__item--choice');
-            options.forEach(option => {
-                if (!option.closest('.choices__group')) {
-                    option.classList.add('choices__item--user');
-                }
-            });
         }
     });
 });
 </script>
-{% endblock %}
-
-
-
-<!-- Chart.js và các plugin -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-
-<!-- Khởi tạo biểu đồ -->
-<!-- Chart.js và các plugin -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 
 <!-- Khởi tạo biểu đồ -->
 <script>
@@ -451,35 +474,5 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-</script>
-
-<!-- Select2 initialization -->
-<script>
-$(document).ready(function() {
-    $('.form-select-tree').select2({
-        templateResult: formatUser,
-        templateSelection: formatUserSelection,
-        escapeMarkup: function(m) { return m; }
-    });
-});
-
-function formatUser(user) {
-    if (!user.id) return user.text;
-    
-    var $user = $(user.element);
-    var role = $user.data('role');
-    var manager = $user.data('manager');
-    
-    if (role === 'manager') {
-        return $('<div class="select2-results__option--manager">' + user.text + '</div>');
-    } else {
-        return $('<div class="select2-results__option--user">' + user.text + '</div>');
-    }
-}
-
-function formatUserSelection(user) {
-    if (!user.id) return user.text;
-    return user.text;
-}
 </script>
 {% endblock %}

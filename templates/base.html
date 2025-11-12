@@ -46,8 +46,102 @@
             position: sticky;
             top: 0;
             width: 230px;
-            z-index: 1;
+            z-index: 1000;
             transition: all 0.3s ease;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .col-auto {
+                position: fixed;
+                left: -230px;
+                z-index: 1050;
+                transition: left 0.3s ease;
+            }
+            
+            .col-auto.show {
+                left: 0;
+            }
+            
+            .sidebar {
+                position: relative;
+                left: 0;
+                width: 230px;
+                height: 100vh;
+                z-index: auto;
+            }
+            
+            .main-content {
+                margin-left: 0 !important;
+                padding: 1rem;
+            }
+            
+            .navbar {
+                padding: 0.5rem;
+            }
+            
+            .table-responsive {
+                font-size: 0.8rem;
+            }
+            
+            .btn-sm {
+                padding: 0.2rem 0.4rem;
+                font-size: 0.7rem;
+            }
+            
+            .card-body {
+                padding: 1rem;
+            }
+            
+            #sidebarToggle {
+                display: block !important;
+                border: 1px solid #4e73df;
+                color: #4e73df;
+                padding: 0.5rem;
+            }
+            
+            #sidebarToggle:hover {
+                background-color: #4e73df;
+                color: white;
+            }
+        }
+
+        /* Mobile sidebar */
+        .mobile-sidebar {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: -230px;
+            width: 230px;
+            height: 100vh;
+            z-index: 1050;
+            transition: left 0.3s ease;
+        }
+
+        .mobile-sidebar.show {
+            left: 0;
+        }
+
+        /* Mobile overlay */
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-sidebar {
+                display: block;
+            }
+            
+            .mobile-overlay.show {
+                display: block;
+            }
         }
 
         .sidebar-brand {
@@ -186,17 +280,6 @@
             margin-bottom: 1rem;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                position: relative;
-            }
-            
-            .main-content {
-                margin: 0.5rem;
-            }
-        }
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
@@ -290,12 +373,81 @@
             </div>
             {% endif %}
 
+            <!-- Mobile Sidebar -->
+            <div class="mobile-sidebar" id="mobileSidebar">
+                <div class="sidebar">
+                    <div class="sidebar-brand">
+                        <h5 class="m-0">
+                            <i class="fas fa-laugh-wink me-2"></i>
+                            Admin Panel
+                        </h5>
+                    </div>
+
+                    <div class="nav flex-column">
+                        <h6>Core</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main_dashboard') }}">
+                                <i class="fas fa-fw fa-tachometer-alt"></i>
+                                Dashboard
+                            </a>
+                        </div>
+
+                        {% if user and (user.is_admin) %}
+                        <h6>Administration</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                                <i class="fas fa-fw fa-users-cog"></i>
+                                Quản lý tài khoản
+                            </a>
+                        </div>
+                        {% endif %}
+
+                        <h6>Data</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('import_data') }}">
+                                <i class="fas fa-fw fa-file-import"></i>
+                                Import Data
+                            </a>
+                        </div>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('view_data') }}">
+                                <i class="fas fa-fw fa-table"></i>
+                                View Data
+                            </a>
+                        </div>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('report') }}">
+                                <i class="fas fa-fw fa-chart-area"></i>
+                                Reports
+                            </a>
+                        </div>
+
+                        <h6>Account</h6>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('profile') }}">
+                                <i class="fas fa-fw fa-user"></i>
+                                Profile
+                            </a>
+                        </div>
+                        <div class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="fas fa-fw fa-sign-out-alt"></i>
+                                Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Overlay -->
+            <div class="mobile-overlay" id="mobileOverlay"></div>
+
             <!-- Main Content -->
             <div class="col">
                 <!-- Navbar -->
                 <nav class="navbar navbar-expand-lg">
                     <div class="container-fluid">
-                        <button class="btn btn-link d-md-none rounded-circle me-3">
+                        <button class="btn btn-outline-primary d-md-none me-3" id="sidebarToggle">
                             <i class="fas fa-bars"></i>
                         </button>
 
@@ -347,12 +499,33 @@
             }
         });
 
-        // Toggle sidebar on mobile
-        const sidebarToggle = document.querySelector('.btn-link');
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', e => {
+        // Mobile sidebar toggle
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const mobileSidebar = document.getElementById('mobileSidebar');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+        
+        if (sidebarToggle && mobileSidebar && mobileOverlay) {
+            // Toggle sidebar
+            sidebarToggle.addEventListener('click', function(e) {
                 e.preventDefault();
-                document.querySelector('.sidebar').classList.toggle('toggled');
+                console.log('Sidebar toggle clicked');
+                mobileSidebar.classList.toggle('show');
+                mobileOverlay.classList.toggle('show');
+                console.log('Mobile sidebar classes:', mobileSidebar.className);
+            });
+            
+            // Close sidebar when clicking overlay
+            mobileOverlay.addEventListener('click', function() {
+                mobileSidebar.classList.remove('show');
+                mobileOverlay.classList.remove('show');
+            });
+            
+            // Close sidebar when clicking nav links on mobile
+            document.querySelectorAll('.mobile-sidebar .nav-link').forEach(link => {
+                link.addEventListener('click', function() {
+                    mobileSidebar.classList.remove('show');
+                    mobileOverlay.classList.remove('show');
+                });
             });
         }
     });
