@@ -10,6 +10,10 @@
                     <input type="text" value="{{ user.username }}" class="form-control" disabled>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label">Tên người dùng</label>
+                    <input type="text" name="full_name" value="{{ user.full_name if user.full_name else '' }}" class="form-control" placeholder="Nhập tên đầy đủ">
+                </div>
+                <div class="mb-3">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" value="{{ user.email }}" class="form-control" required>
                 </div>

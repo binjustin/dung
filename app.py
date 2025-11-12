@@ -60,6 +60,7 @@ class SalesData(db.Model):
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
+    full_name = db.Column(db.String(100))  # Thêm trường Tên người dùng
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(20), default='user')  # Đảm bảo column này tồn tại
@@ -144,6 +145,7 @@ def index():
 def register():
     if request.method == 'POST':
         username = request.form['username']
+        full_name = request.form.get('full_name', '')  # Lấy tên người dùng
         email = request.form['email']
         password = request.form['password']
         
@@ -158,7 +160,7 @@ def register():
             return redirect(url_for('register'))
         
         # Tạo người dùng mới
-        user = User(username=username, email=email)
+        user = User(username=username, full_name=full_name, email=email)
         user.set_password(password)
         
         # Thêm người dùng vào cơ sở dữ liệu
@@ -166,7 +168,7 @@ def register():
         db.session.commit()
         
         flash('Registration successful')
-        return redirect(url_for('login'))
+        return redirect(url_for('admin_dashboard'))
     
     return render_template('register.html')
 
@@ -243,6 +245,7 @@ def admin_edit_user(user_id):
             # In ra form data để debug
             print("Form data received:", request.form)
             
+            full_name = request.form.get('full_name', '')
             email = request.form['email']
             role = request.form['role']
             manager_id = request.form.get('manager_id')
@@ -253,6 +256,7 @@ def admin_edit_user(user_id):
             print(f"New role from form: {role}")
 
             # Cập nhật thông tin
+            user.full_name = full_name
             user.email = email
             user.role = role  # Cập nhật role trực tiếp
             user.is_active = is_active
@@ -1076,6 +1080,7 @@ def api_login():
                 'success': True,
                 'user': {
                     'username': user.username,
+                    'full_name': user.full_name,
                     'email': user.email,
                     'is_admin': user.is_admin
                 }

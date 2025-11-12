@@ -25,6 +25,9 @@
                                 <i class="fas fa-user me-1"></i>Username
                             </th>
                             <th>
+                                <i class="fas fa-id-card me-1"></i>Tên người dùng
+                            </th>
+                            <th>
                                 <i class="fas fa-envelope me-1"></i>Email
                             </th>
                             <th class="text-center">
@@ -54,6 +57,7 @@
                                     {{ user.username }}
                                 </div>
                             </td>
+                            <td>{{ user.full_name if user.full_name else '-' }}</td>
                             <td>{{ user.email }}</td>
                             <td class="text-center">
                                 {% if user.role == 'admin' %}
