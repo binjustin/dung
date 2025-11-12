@@ -1082,6 +1082,7 @@ def api_login():
                     'username': user.username,
                     'full_name': user.full_name,
                     'email': user.email,
+                    'role': user.role,
                     'is_admin': user.is_admin
                 }
             })
