@@ -36,16 +36,19 @@
                     <label class="form-check-label">Is Active</label>
                 </div>
                 {% if user.role != 'admin' %}
-                <div class="mb-3">
+                <div class="mb-3" id="manager-field">
                     <label class="form-label">Quản lý trực tiếp</label>
                     <select name="manager_id" class="form-control">
                         <option value="">Không có</option>
                         {% for manager in managers %}
+                        {% if manager.id != user.id %}
                         <option value="{{ manager.id }}" {% if user.manager_id == manager.id %}selected{% endif %}>
-                            {{ manager.username }}
+                            {{ manager.username }} ({{ manager.role }})
                         </option>
+                        {% endif %}
                         {% endfor %}
                     </select>
+                    <small class="form-text text-muted">Chọn người quản lý trực tiếp của user này</small>
                 </div>
                 {% endif %}
                 <button type="submit" class="btn btn-primary">Update User</button>
@@ -53,4 +56,34 @@
             </form>
         </div>
     </div>
+{% endblock %}
+
+{% block script %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.querySelector('select[name="role"]');
+    const managerField = document.getElementById('manager-field');
+    
+    if (roleSelect && managerField) {
+        function toggleManagerField() {
+            if (roleSelect.value === 'admin') {
+                managerField.style.display = 'none';
+                // Clear manager selection when role is admin
+                const managerSelect = managerField.querySelector('select');
+                if (managerSelect) {
+                    managerSelect.value = '';
+                }
+            } else {
+                managerField.style.display = 'block';
+            }
+        }
+        
+        // Initial check
+        toggleManagerField();
+        
+        // Listen for changes
+        roleSelect.addEventListener('change', toggleManagerField);
+    }
+});
+</script>
 {% endblock %}

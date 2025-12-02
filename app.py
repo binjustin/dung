@@ -11,11 +11,29 @@ from unidecode import unidecode
 import pandas as pd
 import openpyxl
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+
+# Cấu hình logging
+
+if not os.path.exists('logs'):
+    os.mkdir('logs')
+    
+file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240000, backupCount=10)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
+file_handler.setLevel(logging.INFO)
+app.logger.addHandler(file_handler)
+app.logger.setLevel(logging.INFO)
+app.logger.info('Application startup')
+
 db = SQLAlchemy(app)
+
 # Cấu hình upload folder
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
@@ -235,46 +253,89 @@ def admin_edit_user(user_id):
     if request.method == 'POST':
         try:
             # In ra form data để debug
-            print("Form data received:", request.form)
+            app.logger.info(f"Form data received: {request.form}")
             
             full_name = request.form.get('full_name', '')
-            email = request.form['email']
-            role = request.form['role']
-            manager_id = request.form.get('manager_id')
+            email = request.form.get('email', '')
+            role = request.form.get('role', '')
+            manager_id = request.form.get('manager_id', '')
             is_active = 'is_active' in request.form
-            new_password = request.form['new_password']
+            new_password = request.form.get('new_password', '')
 
-            print(f"Current user role: {user.role}")
-            print(f"New role from form: {role}")
+            app.logger.info(f"Current user role: {user.role}, New role: {role}")
+            app.logger.info(f"Manager ID from form: '{manager_id}' (type: {type(manager_id)})")
+
+            # Validation
+            if not email or not role:
+                flash('Email và Role là bắt buộc')
+                return redirect(url_for('admin_edit_user', user_id=user_id))
 
             # Cập nhật thông tin
             user.full_name = full_name
             user.email = email
-            user.role = role  # Cập nhật role trực tiếp
+            user.role = role
             user.is_active = is_active
 
             if new_password:
                 user.set_password(new_password)
 
+            # Handle manager_id carefully
             if role != 'admin':
-                user.manager_id = int(manager_id) if manager_id else None
+                if manager_id and manager_id.strip() and manager_id != '':
+                    try:
+                        new_manager_id = int(manager_id)
+                        
+                        # Validation 1: Không thể tự làm manager của mình
+                        if new_manager_id == user.id:
+                            app.logger.error(f"User cannot be their own manager")
+                            flash('Người dùng không thể là quản lý của chính mình')
+                            return redirect(url_for('admin_edit_user', user_id=user_id))
+                        
+                        # Validation 2: Manager phải tồn tại và có role admin/manager
+                        manager = User.query.get(new_manager_id)
+                        if not manager:
+                            app.logger.error(f"Manager with id {new_manager_id} not found")
+                            flash('Tài khoản quản lý không tồn tại')
+                            return redirect(url_for('admin_edit_user', user_id=user_id))
+                        
+                        if manager.role not in ['admin', 'manager']:
+                            app.logger.error(f"User {new_manager_id} is not a manager/admin")
+                            flash('Tài khoản được chọn không phải là quản lý')
+                            return redirect(url_for('admin_edit_user', user_id=user_id))
+                        
+                        # Validation 3: Kiểm tra circular reference (A -> B -> A)
+                        temp_manager = manager
+                        while temp_manager.manager_id:
+                            if temp_manager.manager_id == user.id:
+                                app.logger.error(f"Circular reference detected")
+                                flash('Không thể tạo vòng lặp phân quyền')
+                                return redirect(url_for('admin_edit_user', user_id=user_id))
+                            temp_manager = User.query.get(temp_manager.manager_id)
+                            if not temp_manager:
+                                break
+                        
+                        user.manager_id = new_manager_id
+                        app.logger.info(f"Setting manager_id to: {user.manager_id}")
+                        
+                    except (ValueError, TypeError) as e:
+                        app.logger.error(f"Invalid manager_id: {manager_id}, error: {e}")
+                        flash('ID quản lý không hợp lệ')
+                        return redirect(url_for('admin_edit_user', user_id=user_id))
+                else:
+                    user.manager_id = None
             else:
                 user.manager_id = None
 
             # Commit changes
-            db.session.add(user)  # Thêm dòng này
             db.session.commit()
-
-            # Verify changes
-            db.session.refresh(user)  # Thêm dòng này
-            print(f"Role after update: {user.role}")
+            app.logger.info(f"User updated successfully. Role after update: {user.role}")
 
             flash('Cập nhật user thành công')
             return redirect(url_for('admin_dashboard'))
             
         except Exception as e:
             db.session.rollback()
-            print(f"Error updating user: {str(e)}")
+            app.logger.error(f"Error updating user: {str(e)}", exc_info=True)
             flash(f'Lỗi khi cập nhật user: {str(e)}')
             return redirect(url_for('admin_edit_user', user_id=user_id))
     
