@@ -152,7 +152,7 @@ function renderInvoiceItem(item, index) {
       </div>
     </div>`;
 }
-
+//fix
 let filtersPopulated = false;
 function populateFilters(filters, users) {
     if (filtersPopulated) return;
