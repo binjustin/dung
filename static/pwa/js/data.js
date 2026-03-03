@@ -158,8 +158,12 @@ function populateFilters(filters, users) {
     if (filtersPopulated) return;
     filtersPopulated = true;
 
-    // Ma Lo
+    // Ma Lo — clear old dynamic options first, keep only the first "Tất cả mã lộ"
     const maLoSelect = document.getElementById('filter-ma-lo');
+    const maLoCurrentValue = maLoSelect.value;
+    while (maLoSelect.options.length > 1) {
+        maLoSelect.remove(1);
+    }
     if (filters && filters.ma_lo_list) {
         filters.ma_lo_list.forEach(ml => {
             const opt = document.createElement('option');
@@ -168,10 +172,16 @@ function populateFilters(filters, users) {
             maLoSelect.appendChild(opt);
         });
     }
+    // Restore previous selection if it still exists
+    maLoSelect.value = maLoCurrentValue;
 
-    // Users (for admin/manager)
+    // Users (for admin/manager) — clear old dynamic options first
     if (users && users.length > 1) {
         const userSelect = document.getElementById('filter-user');
+        const userCurrentValue = userSelect.value;
+        while (userSelect.options.length > 1) {
+            userSelect.remove(1);
+        }
         userSelect.style.display = '';
         users.forEach(u => {
             const opt = document.createElement('option');
@@ -180,6 +190,8 @@ function populateFilters(filters, users) {
             opt.textContent = prefix + u.username;
             userSelect.appendChild(opt);
         });
+        // Restore previous selection if it still exists
+        userSelect.value = userCurrentValue;
     }
 }
 
