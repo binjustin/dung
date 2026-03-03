@@ -1,4 +1,4 @@
-const CACHE_NAME = 'electricbill-pwa-v1';
+const CACHE_NAME = 'electricbill-pwa-v2';
 const STATIC_ASSETS = [
     '/pwa/',
     '/pwa/dashboard.html',
@@ -43,25 +43,14 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Cache-first for static assets
+    // Network-first for static assets (always get fresh code, fallback to cache if offline)
     event.respondWith(
-        caches.match(event.request).then((cached) => {
-            if (cached) {
-                // Update cache in background
-                fetch(event.request).then((res) => {
-                    if (res.ok) {
-                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, res));
-                    }
-                }).catch(() => { });
-                return cached;
+        fetch(event.request).then((res) => {
+            if (res.ok) {
+                const resClone = res.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
             }
-            return fetch(event.request).then((res) => {
-                if (res.ok) {
-                    const resClone = res.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
-                }
-                return res;
-            });
-        })
+            return res;
+        }).catch(() => caches.match(event.request))
     );
 });
