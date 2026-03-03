@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HĐ Điện">
+    <meta name="theme-color" content="#0a0e27">
+    <title>Dữ liệu — Quản Lý HĐ Điện</title>
+    <link rel="manifest" href="/static/pwa/manifest.json">
+    <link rel="apple-touch-icon" href="/static/pwa/assets/icons/icon-192.png">
+    <link rel="stylesheet" href="/static/pwa/css/style.css">
+</head>
+
+<body>
+    <div class="offline-bar" id="offline-bar">⚡ Không có kết nối mạng</div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-user-name" id="sidebar-name">—</div>
+            <div class="sidebar-user-role">
+                <span id="sidebar-username">@—</span>
+                <span class="role-badge user" id="sidebar-role-badge">—</span>
+            </div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="/pwa/dashboard.html" class="sidebar-menu-item">
+                <span class="menu-icon">📊</span> Thống kê
+            </a>
+            <a href="/pwa/data.html" class="sidebar-menu-item active">
+                <span class="menu-icon">📋</span> Dữ liệu
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="sidebar-menu-item" id="logout-btn" style="color: var(--accent-red-light);">
+                <span class="menu-icon">🚪</span> Đăng xuất
+            </button>
+        </div>
+    </aside>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <button class="header-icon-btn" id="menu-btn">☰</button>
+            <h1>Dữ liệu</h1>
+            <button class="header-icon-btn" id="toggle-filters-btn">🔍</button>
+        </header>
+
+        <!-- Filters (collapsible) -->
+        <div class="filters-container hidden" id="filters-panel">
+            <div class="filters-row">
+                <input type="text" class="form-input" id="filter-name" placeholder="Tên khách hàng...">
+            </div>
+            <div class="filters-row">
+                <select class="form-input" id="filter-ma-lo">
+                    <option value="">Tất cả mã lộ</option>
+                </select>
+                <select class="form-input" id="filter-status">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="Đã thanh toán">Đã thanh toán</option>
+                    <option value="Chưa thanh toán" selected>Chưa thanh toán</option>
+                </select>
+            </div>
+            <div class="filters-row">
+                <input type="date" class="form-input" id="filter-date" placeholder="Ngày thu">
+                <select class="form-input" id="filter-user" style="display:none;">
+                    <option value="">Tất cả NV</option>
+                </select>
+            </div>
+            <div class="filters-row">
+                <button class="btn btn-primary btn-sm" id="apply-filters" style="flex:1;">Tìm kiếm</button>
+                <button class="btn btn-ghost btn-sm" id="clear-filters">Xóa lọc</button>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-bar" id="summary-bar">
+            <div class="summary-item">
+                <div class="summary-value" id="summary-count">—</div>
+                <div class="summary-label">Hóa đơn</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" id="summary-amount">—</div>
+                <div class="summary-label">Tổng tiền</div>
+            </div>
+        </div>
+
+        <!-- Invoice List -->
+        <div class="invoice-list" id="invoice-list" style="margin-top: 12px;">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
+
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav">
+            <a href="/pwa/dashboard.html" class="nav-item">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Thống kê</span>
+            </a>
+            <a href="/pwa/data.html" class="nav-item active">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">Dữ liệu</span>
+            </a>
+        </nav>
+    </div>
+
+    <script type="module" src="/static/pwa/js/data.js"></script>
+</body>
+
+</html>

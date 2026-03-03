@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HĐ Điện">
+    <meta name="theme-color" content="#0a0e27">
+    <meta name="description" content="Quản lý thu hóa đơn tiền điện">
+    <title>Đăng nhập — Quản Lý HĐ Điện</title>
+    <link rel="manifest" href="/static/pwa/manifest.json">
+    <link rel="apple-touch-icon" href="/static/pwa/assets/icons/icon-192.png">
+    <link rel="stylesheet" href="/static/pwa/css/style.css">
+</head>
+
+<body>
+    <div class="offline-bar" id="offline-bar">⚡ Không có kết nối mạng</div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <span class="logo-icon">⚡</span>
+                <h2>Quản Lý Hóa Đơn Điện</h2>
+                <p>Đăng nhập để tiếp tục</p>
+            </div>
+
+            <div class="login-error" id="login-error"></div>
+
+            <form id="login-form" autocomplete="on">
+                <div class="form-group">
+                    <label class="form-label" for="username">Tên đăng nhập</label>
+                    <input type="text" class="form-input" id="username" name="username" placeholder="Nhập tên đăng nhập"
+                        autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="password">Mật khẩu</label>
+                    <input type="password" class="form-input" id="password" name="password" placeholder="Nhập mật khẩu"
+                        autocomplete="current-password" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block" id="login-btn"
+                    style="margin-top: 8px; padding: 14px;">
+                    Đăng nhập
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="/static/pwa/js/login.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pwa/' });
+        }
+    </script>
+</body>
+
+</html>

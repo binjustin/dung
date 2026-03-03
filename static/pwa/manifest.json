@@ -1,0 +1,25 @@
+{
+    "name": "Quản Lý Hóa Đơn Điện",
+    "short_name": "HĐ Điện",
+    "description": "Ứng dụng quản lý thu hóa đơn tiền điện",
+    "start_url": "/pwa/",
+    "scope": "/pwa/",
+    "display": "standalone",
+    "background_color": "#0a0e27",
+    "theme_color": "#0a0e27",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/static/pwa/assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/static/pwa/assets/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HĐ Điện">
+    <meta name="theme-color" content="#0a0e27">
+    <title>Thống kê — Quản Lý HĐ Điện</title>
+    <link rel="manifest" href="/static/pwa/manifest.json">
+    <link rel="apple-touch-icon" href="/static/pwa/assets/icons/icon-192.png">
+    <link rel="stylesheet" href="/static/pwa/css/style.css">
+</head>
+
+<body>
+    <div class="offline-bar" id="offline-bar">⚡ Không có kết nối mạng</div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-user-name" id="sidebar-name">—</div>
+            <div class="sidebar-user-role">
+                <span id="sidebar-username">@—</span>
+                <span class="role-badge user" id="sidebar-role-badge">—</span>
+            </div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="/pwa/dashboard.html" class="sidebar-menu-item active">
+                <span class="menu-icon">📊</span> Thống kê
+            </a>
+            <a href="/pwa/data.html" class="sidebar-menu-item">
+                <span class="menu-icon">📋</span> Dữ liệu
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="sidebar-menu-item" id="logout-btn" style="color: var(--accent-red-light);">
+                <span class="menu-icon">🚪</span> Đăng xuất
+            </button>
+        </div>
+    </aside>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <button class="header-icon-btn" id="menu-btn">☰</button>
+            <h1>Thống kê</h1>
+            <button class="header-icon-btn" id="refresh-btn">↻</button>
+        </header>
+
+        <!-- Stats Cards -->
+        <div id="stats-content">
+            <div class="stats-grid">
+                <div class="stat-card blue">
+                    <div class="stat-icon">📄</div>
+                    <div class="stat-value" id="stat-total-invoices">—</div>
+                    <div class="stat-label">Tổng hóa đơn</div>
+                </div>
+                <div class="stat-card amber">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-value" id="stat-total-money">—</div>
+                    <div class="stat-label">Tổng tiền</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-value" id="stat-paid-invoices">—</div>
+                    <div class="stat-label">Đã thanh toán</div>
+                </div>
+                <div class="stat-card red">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-value" id="stat-unpaid-invoices">—</div>
+                    <div class="stat-label">Chưa thanh toán</div>
+                </div>
+                <div class="stat-card green full-width">
+                    <div class="stat-icon">💵</div>
+                    <div class="stat-value" id="stat-paid-money">—</div>
+                    <div class="stat-label">Đã thu</div>
+                </div>
+                <div class="stat-card red full-width">
+                    <div class="stat-icon">📌</div>
+                    <div class="stat-value" id="stat-unpaid-money">—</div>
+                    <div class="stat-label">Chưa thu</div>
+                </div>
+            </div>
+
+            <!-- Ma Lo Stats -->
+            <div class="section-header">
+                <span class="section-title">Thống kê theo mã lộ</span>
+            </div>
+            <div class="invoice-list" id="ma-lo-stats-list">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav">
+            <a href="/pwa/dashboard.html" class="nav-item active">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Thống kê</span>
+            </a>
+            <a href="/pwa/data.html" class="nav-item">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">Dữ liệu</span>
+            </a>
+        </nav>
+    </div>
+
+    <script type="module" src="/static/pwa/js/dashboard.js"></script>
+</body>
+
+</html>

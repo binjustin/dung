@@ -1450,6 +1450,23 @@ def check_payment_status(invoice_id):
         }), 500
 
 
+# PWA Routes
+@app.route('/pwa/sw.js')
+def pwa_service_worker():
+    response = app.send_static_file('pwa/sw.js')
+    response.headers['Service-Worker-Allowed'] = '/pwa/'
+    response.headers['Content-Type'] = 'application/javascript'
+    return response
+
+@app.route('/pwa/')
+def pwa_index():
+    return app.send_static_file('pwa/index.html')
+
+@app.route('/pwa/<path:filename>')
+def pwa_pages(filename):
+    return app.send_static_file(f'pwa/{filename}')
+
+
 if __name__ == '__main__':
     init_db()
     app.run(debug=True)
