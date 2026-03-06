@@ -43,7 +43,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Network-first for static assets (always get fresh code, fallback to cache if offline)
+    // Network-first for static assets
     event.respondWith(
         fetch(event.request).then((res) => {
             if (res.ok) {
@@ -51,6 +51,19 @@ self.addEventListener('fetch', (event) => {
                 caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
             }
             return res;
-        }).catch(() => caches.match(event.request))
+        }).catch(() =>
+            caches.match(event.request).then((cached) => {
+                if (cached) return cached;
+                // Fallback for navigation requests — return login page from cache
+                if (event.request.mode === 'navigate') {
+                    return caches.match('/pwa/') || new Response(
+                        '<html><body style="background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><h2>⚡ Không có kết nối mạng</h2></body></html>',
+                        { headers: { 'Content-Type': 'text/html' } }
+                    );
+                }
+                return new Response('', { status: 404 });
+            })
+        )
     );
 });
+
